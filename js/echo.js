@@ -9,9 +9,13 @@ const ALPHA_BUCKETS = 14;
 
 const Echoes = {
   waves: [],
+  now: 0,             // η ώρα του παιχνιδιού στο τελευταίο update
   litTime: null,      // πότε φωτίστηκε τελευταία φορά κάθε κομμάτι τοίχου
   litStrength: null,  // πόσο δυνατά φωτίστηκε
-  listeners: [],      // συναρτήσεις που "ακούνε" κάθε νέο ήχο (π.χ. τέρατα αργότερα)
+  // Αντικείμενα που "ακούνε": { x, y, onHear(wave, dist, los) }.
+  // Το onHear καλείται μία φορά ανά κύμα, τη στιγμή που το δαχτυλίδι τα φτάνει
+  // (αν είναι εντός ακτίνας). los = αν υπάρχει οπτική επαφή με την πηγή του ήχου.
+  listeners: [],
   _buckets: null,
 
   init() {
@@ -24,7 +28,7 @@ const Echoes = {
   },
 
   // Νέος ήχος στο (x, y). radius = πόσο μακριά φτάνει, strength = 0..1.
-  // kind: 'step' | 'call' (για μελλοντική χρήση από τέρατα).
+  // kind: 'step' | 'call'.
   emit(x, y, radius, strength, kind) {
     const L = Level;
     const r2 = radius * radius;
@@ -38,21 +42,25 @@ const Echoes = {
     }
     hits.sort((a, b) => a.d - b.d);
 
-    const wave = { x, y, radius, strength, kind, r: 0, hits, ptr: 0 };
+    const wave = { x, y, radius, strength, kind, r: 0, hits, ptr: 0, reached: new Set() };
     this.waves.push(wave);
-    for (const fn of this.listeners) fn(wave);
     return wave;
   },
 
+  // Πόσο δυνατό είναι το κύμα σε απόσταση d από την πηγή του (0..1).
+  strengthAt(wave, d) {
+    return wave.strength * Math.pow(Math.max(0, 1 - d / wave.radius), 0.7);
+  },
+
   update(dt, now) {
+    this.now = now;
     for (let w = this.waves.length - 1; w >= 0; w--) {
       const wave = this.waves[w];
       wave.r += WAVE_SPEED * dt;
 
       while (wave.ptr < wave.hits.length && wave.hits[wave.ptr].d <= wave.r) {
         const h = wave.hits[wave.ptr++];
-        const t = h.d / wave.radius;
-        const s = wave.strength * Math.pow(1 - t, 0.7);
+        const s = this.strengthAt(wave, h.d);
         // Ανανεώνουμε μόνο αν το νέο φως είναι πιο δυνατό από όσο έχει μείνει.
         const age = now - this.litTime[h.i];
         const current = age < ECHO_FADE ? this.litStrength[h.i] * (1 - age / ECHO_FADE) : 0;
@@ -60,6 +68,15 @@ const Echoes = {
           this.litTime[h.i] = now;
           this.litStrength[h.i] = s;
         }
+      }
+
+      for (const l of this.listeners) {
+        if (wave.reached.has(l)) continue;
+        const d = Math.hypot(l.x - wave.x, l.y - wave.y);
+        if (d > wave.radius) { wave.reached.add(l); continue; }
+        if (d > wave.r) continue;
+        wave.reached.add(l);
+        l.onHear(wave, d, Level.lineOfSight(wave.x, wave.y, l.x, l.y));
       }
 
       if (wave.r >= wave.radius) this.waves.splice(w, 1);

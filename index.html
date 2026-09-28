@@ -18,10 +18,23 @@
     <p class="lead">Δεν βλέπεις τίποτα.<br>Μόνο ό,τι ακούς.</p>
     <div class="help">
       <p><b>Αριστερά:</b> σύρε το δάχτυλο για να περπατήσεις</p>
+      <p>Λίγο σπρώξιμο = αθόρυβα · πολύ = τρέχεις και ακούγεσαι</p>
       <p><b>Δεξιά:</b> πάτα για ήχο — κράτα για πιο δυνατό</p>
-      <p class="desktop">Υπολογιστής: <b>WASD</b> κίνηση, <b>Space</b> ήχος</p>
+      <p class="desktop">Υπολογιστής: <b>WASD</b> κίνηση, <b>Shift</b> αθόρυβα, <b>Space</b> ήχος</p>
     </div>
+    <p class="warn">Κάτι σε ακούει. Βρες την πόρτα.</p>
     <p class="start">Άγγιξε για να ξεκινήσεις</p>
+  </div>
+
+  <div id="gameover" class="overlay end hidden">
+    <h2>Σε βρήκε.</h2>
+    <button class="again" type="button">Ξανά</button>
+  </div>
+
+  <div id="win" class="overlay end hidden">
+    <h2>Βγήκες.</h2>
+    <p id="win-time"></p>
+    <button class="again" type="button">Ξανά</button>
   </div>
 
   <div id="rotate" class="overlay">
@@ -31,6 +44,8 @@
   <script src="js/level.js"></script>
   <script src="js/echo.js"></script>
   <script src="js/input.js"></script>
+  <script src="js/monster.js"></script>
+  <script src="js/exit.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

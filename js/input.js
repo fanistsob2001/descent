@@ -3,6 +3,9 @@
 // Ακτίνα του εικονικού joystick σε CSS pixels.
 const JOY_RADIUS = 55;
 const JOY_DEADZONE = 0.12;
+// Πάνω από αυτό το ποσοστό του joystick ο παίκτης τρέχει (και κάνει θόρυβο).
+// Κάτω από αυτό περπατάει αργά και αθόρυβα.
+const RUN_THRESHOLD = 0.6;
 // Μέγιστος χρόνος φόρτισης του κύματος (δευτ.).
 const MAX_CHARGE = 1.5;
 
@@ -10,6 +13,7 @@ const Input = {
   keys: {},
   moveX: 0,
   moveY: 0,
+  running: false,   // true = γρήγορο περπάτημα με θόρυβο βημάτων
 
   // Εικονικό joystick (αριστερό μισό οθόνης). Εμφανίζεται εκεί που ακουμπάς.
   joy: { id: null, ox: 0, oy: 0, x: 0, y: 0 },
@@ -119,12 +123,15 @@ const Input = {
     const kx = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
     const ky = (k.KeyS || k.ArrowDown ? 1 : 0) - (k.KeyW || k.ArrowUp ? 1 : 0);
     if (kx || ky) {
-      const l = Math.hypot(kx, ky);
+      // Με Shift: αργό, αθόρυβο περπάτημα.
+      const sneak = k.ShiftLeft || k.ShiftRight;
+      const l = Math.hypot(kx, ky) / (sneak ? RUN_THRESHOLD : 1);
       mx = kx / l;
       my = ky / l;
     }
 
     this.moveX = mx;
     this.moveY = my;
+    this.running = Math.hypot(mx, my) > RUN_THRESHOLD + 1e-3;
   },
 };

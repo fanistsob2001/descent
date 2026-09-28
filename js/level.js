@@ -7,7 +7,8 @@ const TILE = 40;
 // που φωτίζονται ανεξάρτητα όταν τα ακουμπάει το κύμα.
 const WALL_SAMPLE_STEP = 5;
 
-// Χειροποίητος λαβύρινθος.  # = τοίχος   . = διάδρομος   S = αφετηρία
+// Χειροποίητος λαβύρινθος.
+// # = τοίχος   . = διάδρομος   S = αφετηρία   M = τέρας   E = έξοδος (στο εξωτερικό τείχος)
 const LEVEL_1 = [
   '###################',
   '#S....#.........#.#',
@@ -28,7 +29,7 @@ const LEVEL_1 = [
   '#.#.#.#.#.#.###.#.#',
   '#.#.......#...#...#',
   '#.#########.#.#####',
-  '#...........#.....#',
+  '#.....M.....#.....#',
   '###.#########.###.#',
   '#...#.........#...#',
   '#.###.#######.#.###',
@@ -40,7 +41,7 @@ const LEVEL_1 = [
   '#.#####.#########.#',
   '#.#.............#.#',
   '#.#.###########.#.#',
-  '#.......#.........#',
+  '#.......#.........E',
   '###################',
 ];
 
@@ -49,6 +50,8 @@ const Level = {
   rows: 0,
   grid: null,          // Uint8Array, 1 = τοίχος
   start: { x: 0, y: 0 },
+  monsterStart: { x: 0, y: 0 },
+  exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
   segCount: 0,
@@ -66,10 +69,10 @@ const Level = {
       for (let x = 0; x < this.cols; x++) {
         const c = map[y][x] || '#';
         this.grid[y * this.cols + x] = c === '#' ? 1 : 0;
-        if (c === 'S') {
-          this.start.x = (x + 0.5) * TILE;
-          this.start.y = (y + 0.5) * TILE;
-        }
+        const cx = (x + 0.5) * TILE, cy = (y + 0.5) * TILE;
+        if (c === 'S') { this.start.x = cx; this.start.y = cy; }
+        if (c === 'M') { this.monsterStart.x = cx; this.monsterStart.y = cy; }
+        if (c === 'E') { this.exit.tx = x; this.exit.ty = y; this.exit.x = cx; this.exit.y = cy; }
       }
     }
 
@@ -79,6 +82,61 @@ const Level = {
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
     return this.grid[ty * this.cols + tx] === 1;
+  },
+
+  // Αναζήτηση κατά πλάτος στο πλέγμα. Επιστρέφει Int32Array με την απόσταση
+  // (σε κελιά) κάθε κελιού από το (sx, sy), -1 = απρόσιτο, και τον "γονέα" του.
+  bfs(sx, sy, maxSteps = Infinity) {
+    const n = this.cols * this.rows;
+    const dist = new Int32Array(n).fill(-1);
+    const parent = new Int32Array(n).fill(-1);
+    const queue = new Int32Array(n);
+    let head = 0, tail = 0;
+    const start = sy * this.cols + sx;
+    dist[start] = 0;
+    queue[tail++] = start;
+    while (head < tail) {
+      const cur = queue[head++];
+      if (dist[cur] >= maxSteps) continue;
+      const cx = cur % this.cols, cy = (cur / this.cols) | 0;
+      const next = [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]];
+      for (const [nx, ny] of next) {
+        if (this.isWall(nx, ny)) continue;
+        const ni = ny * this.cols + nx;
+        if (dist[ni] !== -1) continue;
+        dist[ni] = dist[cur] + 1;
+        parent[ni] = cur;
+        queue[tail++] = ni;
+      }
+    }
+    return { dist, parent };
+  },
+
+  // Διαδρομή από κελί σε κελί: λίστα από [tx, ty], χωρίς το αρχικό κελί.
+  findPath(sx, sy, tx, ty) {
+    if (this.isWall(tx, ty)) return [];
+    const { parent, dist } = this.bfs(sx, sy);
+    let cur = ty * this.cols + tx;
+    if (dist[cur] === -1) return [];
+    const path = [];
+    while (dist[cur] > 0) {
+      path.push([cur % this.cols, (cur / this.cols) | 0]);
+      cur = parent[cur];
+    }
+    return path.reverse();
+  },
+
+  // Τυχαίο κελί διαδρόμου σε απόσταση minSteps..maxSteps (σε κελιά) από το (sx, sy).
+  randomFloorNear(sx, sy, minSteps, maxSteps) {
+    const { dist } = this.bfs(sx, sy, maxSteps);
+    const options = [];
+    for (let i = 0; i < dist.length; i++) {
+      const tx = i % this.cols, ty = (i / this.cols) | 0;
+      if (tx === this.exit.tx && ty === this.exit.ty) continue;
+      if (dist[i] >= minSteps && dist[i] <= maxSteps) options.push([tx, ty]);
+    }
+    if (options.length === 0) return [sx, sy];
+    return options[Math.floor(Math.random() * options.length)];
   },
 
   // Φτιάχνει κομμάτια μόνο στις πλευρές τοίχων που βλέπουν σε διάδρομο.

@@ -71,6 +71,13 @@ body {
   opacity: 0.55;
 }
 
+#title .warn {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: #e08a80;
+}
+
 #title .desktop {
   display: none;
 }
@@ -92,6 +99,63 @@ body {
 @keyframes breathe {
   0%, 100% { opacity: 0.15; }
   50% { opacity: 0.7; }
+}
+
+/* Οθόνες τέλους (Game Over / νίκη). */
+.end {
+  z-index: 5;
+  animation: fade-in 0.6s ease-out;
+}
+
+.end h2 {
+  font-size: 2.2rem;
+  font-weight: normal;
+  font-style: italic;
+  letter-spacing: 0.08em;
+}
+
+#gameover {
+  background: radial-gradient(circle at center, #1a0000 0%, #000 70%);
+}
+
+#gameover h2 {
+  color: #ff6a5a;
+  text-shadow: 0 0 20px rgba(255, 40, 30, 0.6);
+}
+
+#win h2 {
+  color: #ffdcaa;
+  text-shadow: 0 0 20px rgba(255, 200, 130, 0.5);
+}
+
+#win-time {
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+.again {
+  margin-top: 0.8rem;
+  padding: 14px 44px;
+  font: inherit;
+  font-size: 1rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #dce8ff;
+  background: transparent;
+  border: 1px solid rgba(200, 220, 255, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.again:active {
+  background: rgba(200, 220, 255, 0.12);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Μήνυμα για οριζόντιο κινητό. */
