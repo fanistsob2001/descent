@@ -13,8 +13,12 @@ const CALL_WAVE = { minR: 110, maxR: 560, minS: 0.5, maxS: 1.0 };   // το "κ�
 const VIEW_MIN_W = 440;
 const VIEW_MIN_H = 700;
 
-// Πόσο κρατάει η "στιγμή" του θανάτου πριν βγει η οθόνη Game Over (δευτ.).
-const DEATH_DELAY = 1;
+// Πόσο κρατάει η "στιγμή" του θανάτου (jump scare + κόκκινο σβήσιμο)
+// πριν βγει η οθόνη Game Over (δευτ.).
+const DEATH_DELAY = 1.7;
+
+// Ένταση του ambient βουητού ανά κατάσταση.
+const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, cleared: 0.5, end: 0.5 };
 
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
@@ -90,6 +94,7 @@ function updatePlayer(dt) {
     const side = 3 * player.foot;
     Echoes.emit(player.x - uy * side, player.y + ux * side,
       STEP_WAVE.radius, STEP_WAVE.strength, 'step');
+    Sound.step();
   }
 }
 
@@ -100,12 +105,14 @@ function emitCall(held) {
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
     'call');
+  Sound.ping(c);
   Hints.notify('call');
 }
 
 function throwLure() {
   if (state !== 'play') return;
   if (Lures.throw(player.x, player.y, player.fx, player.fy, gameTime)) {
+    Sound.lureThrow();
     Hints.notify('lure');
     updateHud();
   }
@@ -119,14 +126,24 @@ function draw() {
 
   if (state === 'menu') return;
 
+  // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο.
+  if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    Scare.draw(ctx, cssW, cssH, gameTime - endTime);
+    return;
+  }
+
   const halfW = cssW / 2 / scale, halfH = cssH / 2 / scale;
   const view = {
     x0: camera.x - halfW, x1: camera.x + halfW,
     y0: camera.y - halfH, y1: camera.y + halfH,
   };
 
+  const [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
   const s = scale * dpr;
-  ctx.setTransform(s, 0, 0, s, (cssW / 2 - camera.x * scale) * dpr, (cssH / 2 - camera.y * scale) * dpr);
+  ctx.setTransform(s, 0, 0, s,
+    (cssW / 2 - camera.x * scale + shakeX) * dpr,
+    (cssH / 2 - camera.y * scale + shakeY) * dpr);
 
   if (showMap) drawDebugMap();
 
@@ -137,8 +154,7 @@ function draw() {
   for (const m of monsters) {
     if (state === 'dead' && m === killer) {
       // Το τέρας φαίνεται ολόκληρο εκεί που σε έπιασε.
-      const t = (gameTime - endTime) / DEATH_DELAY;
-      m.draw(ctx, gameTime, Math.max(0.25, 1 - t * 0.6));
+      m.draw(ctx, gameTime, Math.max(0.25, 1 - deathFade() * 0.6));
     } else {
       m.draw(ctx, gameTime);
     }
@@ -146,6 +162,7 @@ function draw() {
   drawPlayer();
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (state === 'play' || state === 'paused') Dread.drawVignette(ctx, cssW, cssH, gameTime);
   if (state === 'play') drawJoystick();
   if (state === 'dead') drawDeathFlash();
 }
@@ -200,8 +217,13 @@ function drawJoystick() {
   ctx.fill();
 }
 
+// 0..1: πόσο έχει προχωρήσει το κόκκινο σβήσιμο μετά το jump scare.
+function deathFade() {
+  return Math.max(0, Math.min(1, (gameTime - endTime - SCARE_TIME) / (DEATH_DELAY - SCARE_TIME)));
+}
+
 function drawDeathFlash() {
-  const t = Math.min(1, (gameTime - endTime) / DEATH_DELAY);
+  const t = deathFade();
   const a = 0.55 * (1 - t) + 0.2;
   const g = ctx.createRadialGradient(cssW / 2, cssH / 2, Math.min(cssW, cssH) * 0.15,
     cssW / 2, cssH / 2, Math.max(cssW, cssH) * 0.75);
@@ -256,8 +278,14 @@ function frame(t) {
     Echoes.update(dt, gameTime);
     if (gameTime - endTime >= DEATH_DELAY && screens.gameover.classList.contains('hidden')) {
       showScreen('gameover');
+      Sound.gameOver();
     }
   }
+
+  // Γρύλισμα, καρδιοχτύπι, βινιετάρισμα: μόνο όσο παίζεις.
+  Sound.listenerX = player.x;
+  Sound.listenerY = player.y;
+  Dread.update(dt, gameTime, player, monsters, state === 'play');
 
   draw();
   requestAnimationFrame(frame);
@@ -330,8 +358,14 @@ function stopInput() {
   Input.joy.id = null;
 }
 
+function setState(s) {
+  state = s;
+  Sound.setAmbient(AMBIENT[s]);
+}
+
 // Ξεκινάει (ή ξαναξεκινάει) το επίπεδο i (0 = πρώτο).
 function startLevel(i) {
+  Sound.unlock();   // πρέπει να γίνει μέσα στο πάτημα του κουμπιού (iPhone)
   goFullscreen();
   levelIndex = i;
   const lv = LEVELS[i];
@@ -353,7 +387,8 @@ function startLevel(i) {
   [player.fx, player.fy] = open || [0, 1];
 
   stopInput();
-  state = 'play';
+  Dread.reset();
+  setState('play');
   runStart = gameTime;
   showScreen(null);
   updateHud();
@@ -362,14 +397,18 @@ function startLevel(i) {
 
   // Μια πρώτη ανάσα: ένα μέτριο κύμα για να δεις πού βρίσκεσαι.
   Echoes.emit(player.x, player.y, 220, 0.6, 'call');
+  Sound.ping(0.3);
 }
 
 function die() {
-  state = 'dead';
+  setState('dead');
   endTime = gameTime;
   stopInput();
   Hints.stop();
   showScreen(null);
+  Scare.prepare();
+  Sound.scare();
+  vibrate([250, 60, 500]);
 }
 
 function levelCleared() {
@@ -377,13 +416,14 @@ function levelCleared() {
   stopInput();
   Hints.stop();
   Progress.unlock(levelIndex + 2);
+  Sound.win();
 
   if (levelIndex + 1 >= LEVELS.length) {
-    state = 'end';
+    setState('end');
     showScreen('end');
     return;
   }
-  state = 'cleared';
+  setState('cleared');
   const secs = Math.floor(endTime - runStart);
   $('cleared-title').textContent = `Level ${levelIndex + 1} cleared`;
   $('cleared-time').textContent = `Time ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
@@ -392,31 +432,37 @@ function levelCleared() {
 
 function pauseGame() {
   if (state !== 'play') return;
-  state = 'paused';
+  setState('paused');
   stopInput();
   showScreen('pause');
 }
 
 function resumeGame() {
   if (state !== 'paused') return;
-  state = 'play';
+  setState('play');
   showScreen(null);
 }
 
 function goToMenu() {
-  state = 'menu';
+  setState('menu');
   stopInput();
   Hints.stop();
   showScreen('menu');
 }
 
+function updateMuteLabel() {
+  $('btn-mute').textContent = Sound.muted ? 'Sound: off' : 'Sound: on';
+}
+
 function doAction(action) {
+  Sound.unlock();
   blurButtons();
   if (action === 'play') startLevel(Progress.unlocked - 1);
   else if (action === 'resume') resumeGame();
   else if (action === 'restart') startLevel(levelIndex);
   else if (action === 'next') startLevel(levelIndex + 1);
   else if (action === 'menu') goToMenu();
+  else if (action === 'mute') { Sound.setMuted(!Sound.muted); updateMuteLabel(); }
 }
 
 // Η ορατή οθόνη (αν υπάρχει) και το κύριο κουμπί της.
@@ -430,6 +476,8 @@ function visibleScreen() {
 // ---- Έναρξη ----
 function init() {
   Progress.load();
+  Sound.loadSettings();
+  updateMuteLabel();
   Hints.init($('hint'));
 
   Input.now = () => gameTime;
@@ -459,9 +507,11 @@ function init() {
     }
   });
 
-  // Αν η σελίδα κρυφτεί (π.χ. έρχεται κλήση), το παιχνίδι μπαίνει σε παύση.
+  // Αν η σελίδα κρυφτεί (π.χ. έρχεται κλήση), το παιχνίδι μπαίνει σε παύση
+  // και ο ήχος σταματάει.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pauseGame();
+    Sound.setBackground(document.hidden);
   });
 
   // Κλείδωμα zoom / scroll / μενού στα κινητά.

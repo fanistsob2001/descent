@@ -53,6 +53,7 @@ const Lures = {
       const age = now - it.born;
       while (it.pulses < LURE_PULSES && age >= LURE_DELAY + it.pulses * LURE_PULSE_GAP) {
         Echoes.emit(it.x, it.y, LURE_WAVE.radius, LURE_WAVE.strength, 'lure');
+        Sound.lureBeep(it.x, it.y);
         it.pulses++;
         it.lastPulse = now;
       }
