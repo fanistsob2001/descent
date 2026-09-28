@@ -1,0 +1,108 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #c8d6ee;
+  font-family: Georgia, 'Times New Roman', serif;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  display: block;
+  touch-action: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+  padding: 24px 16px;
+  text-align: center;
+  background: #000;
+  touch-action: none;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+#title h1 {
+  font-size: 3.4rem;
+  font-weight: normal;
+  letter-spacing: 0.6em;
+  margin-right: -0.6em; /* αντισταθμίζει το letter-spacing για σωστό κεντράρισμα */
+  color: #dce8ff;
+  text-shadow: 0 0 18px rgba(120, 170, 255, 0.55);
+}
+
+#title .lead {
+  font-style: italic;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+#title .help {
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  line-height: 1.8;
+  opacity: 0.55;
+}
+
+#title .desktop {
+  display: none;
+}
+
+@media (pointer: fine) {
+  #title .desktop {
+    display: block;
+  }
+}
+
+#title .start {
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.7; }
+}
+
+/* Μήνυμα για οριζόντιο κινητό. */
+#rotate {
+  display: none;
+  z-index: 10;
+  font-family: system-ui, sans-serif;
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #rotate {
+    display: flex;
+  }
+}

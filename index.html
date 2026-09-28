@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Ηχώ</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="title" class="overlay">
+    <h1>ΗΧΩ</h1>
+    <p class="lead">Δεν βλέπεις τίποτα.<br>Μόνο ό,τι ακούς.</p>
+    <div class="help">
+      <p><b>Αριστερά:</b> σύρε το δάχτυλο για να περπατήσεις</p>
+      <p><b>Δεξιά:</b> πάτα για ήχο — κράτα για πιο δυνατό</p>
+      <p class="desktop">Υπολογιστής: <b>WASD</b> κίνηση, <b>Space</b> ήχος</p>
+    </div>
+    <p class="start">Άγγιξε για να ξεκινήσεις</p>
+  </div>
+
+  <div id="rotate" class="overlay">
+    <p>Γύρισε το κινητό όρθιο</p>
+  </div>
+
+  <script src="js/level.js"></script>
+  <script src="js/echo.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
