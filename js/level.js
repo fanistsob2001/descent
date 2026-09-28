@@ -7,50 +7,14 @@ const TILE = 40;
 // που φωτίζονται ανεξάρτητα όταν τα ακουμπάει το κύμα.
 const WALL_SAMPLE_STEP = 5;
 
-// Χειροποίητος λαβύρινθος.
-// # = τοίχος   . = διάδρομος   S = αφετηρία   M = τέρας   E = έξοδος (στο εξωτερικό τείχος)
-const LEVEL_1 = [
-  '###################',
-  '#S....#.........#.#',
-  '#.###.#.#######.#.#',
-  '#.#...#.#.....#...#',
-  '#.#.###.#.###.#####',
-  '#.#.....#.#.......#',
-  '#.#######.#.#####.#',
-  '#.........#.#...#.#',
-  '#####.#####.#.#.#.#',
-  '#...#.#.....#.#...#',
-  '#.#.#.#.#####.#####',
-  '#.#...#.....#.....#',
-  '#.#########.#####.#',
-  '#.#.......#.......#',
-  '#.#.#.#.#.#######.#',
-  '#.........#.....#.#',
-  '#.#.#.#.#.#.###.#.#',
-  '#.#.......#...#...#',
-  '#.#########.#.#####',
-  '#.....M.....#.....#',
-  '###.#########.###.#',
-  '#...#.........#...#',
-  '#.###.#######.#.###',
-  '#.#...#.....#.#...#',
-  '#.#.###.###.#.###.#',
-  '#.#.#...#...#...#.#',
-  '#.#.#.###.#####.#.#',
-  '#...#...#.......#.#',
-  '#.#####.#########.#',
-  '#.#.............#.#',
-  '#.#.###########.#.#',
-  '#.......#.........E',
-  '###################',
-];
+// Οι χάρτες των επιπέδων βρίσκονται στο js/levels.js.
 
 const Level = {
   cols: 0,
   rows: 0,
   grid: null,          // Uint8Array, 1 = τοίχος
   start: { x: 0, y: 0 },
-  monsterStart: { x: 0, y: 0 },
+  monsters: [],        // { x, y, guard } — θέσεις εκκίνησης των τεράτων
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -64,6 +28,7 @@ const Level = {
     this.rows = map.length;
     this.cols = map[0].length;
     this.grid = new Uint8Array(this.cols * this.rows);
+    this.monsters = [];
 
     for (let y = 0; y < this.rows; y++) {
       for (let x = 0; x < this.cols; x++) {
@@ -71,7 +36,7 @@ const Level = {
         this.grid[y * this.cols + x] = c === '#' ? 1 : 0;
         const cx = (x + 0.5) * TILE, cy = (y + 0.5) * TILE;
         if (c === 'S') { this.start.x = cx; this.start.y = cy; }
-        if (c === 'M') { this.monsterStart.x = cx; this.monsterStart.y = cy; }
+        if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G' });
         if (c === 'E') { this.exit.tx = x; this.exit.ty = y; this.exit.x = cx; this.exit.y = cy; }
       }
     }
@@ -82,6 +47,41 @@ const Level = {
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
     return this.grid[ty * this.cols + tx] === 1;
+  },
+
+  // Σπρώχνει έναν κύκλο { x, y, r } έξω από τους τοίχους.
+  // Επιστρέφει true αν ακούμπησε τοίχο.
+  pushOutOfWalls(p) {
+    const r = p.r;
+    let hit = false;
+    const minTx = Math.floor((p.x - r) / TILE), maxTx = Math.floor((p.x + r) / TILE);
+    const minTy = Math.floor((p.y - r) / TILE), maxTy = Math.floor((p.y + r) / TILE);
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        if (!this.isWall(tx, ty)) continue;
+        const cx = Math.max(tx * TILE, Math.min(p.x, tx * TILE + TILE));
+        const cy = Math.max(ty * TILE, Math.min(p.y, ty * TILE + TILE));
+        const dx = p.x - cx, dy = p.y - cy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= r * r) continue;
+        hit = true;
+        if (d2 > 1e-8) {
+          const d = Math.sqrt(d2);
+          p.x += (dx / d) * (r - d);
+          p.y += (dy / d) * (r - d);
+        } else {
+          // Το κέντρο μπήκε μέσα στον τοίχο: βγάλ' το από την κοντινότερη πλευρά.
+          const left = p.x - tx * TILE, right = tx * TILE + TILE - p.x;
+          const top = p.y - ty * TILE, bottom = ty * TILE + TILE - p.y;
+          const m = Math.min(left, right, top, bottom);
+          if (m === left) p.x = tx * TILE - r;
+          else if (m === right) p.x = tx * TILE + TILE + r;
+          else if (m === top) p.y = ty * TILE - r;
+          else p.y = ty * TILE + TILE + r;
+        }
+      }
+    }
+    return hit;
   },
 
   // Αναζήτηση κατά πλάτος στο πλέγμα. Επιστρέφει Int32Array με την απόσταση

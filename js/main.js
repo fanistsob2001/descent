@@ -16,23 +16,31 @@ const VIEW_MIN_H = 700;
 // Πόσο κρατάει η "στιγμή" του θανάτου πριν βγει η οθόνη Game Over (δευτ.).
 const DEATH_DELAY = 1;
 
-// ---- Κατάσταση ----
-const canvas = document.getElementById('game');
+// ---- Στοιχεία σελίδας ----
+const $ = (id) => document.getElementById(id);
+const canvas = $('game');
 const ctx = canvas.getContext('2d', { alpha: false });
-const titleEl = document.getElementById('title');
-const gameOverEl = document.getElementById('gameover');
-const winEl = document.getElementById('win');
-const winTimeEl = document.getElementById('win-time');
+const screens = {
+  menu: $('menu'), pause: $('pause'), gameover: $('gameover'), cleared: $('cleared'), end: $('end'),
+};
+const hudEl = $('hud');
+const lureBtn = $('btn-lure');
 
+// ---- Κατάσταση ----
 let cssW = 0, cssH = 0, dpr = 1, scale = 1;
-let state = 'title';     // 'title' | 'play' | 'dead' | 'won'
+// 'menu' | 'play' | 'paused' | 'dead' | 'cleared' | 'end'
+let state = 'menu';
+let levelIndex = 0;
 let gameTime = 0;
 let lastFrame = 0;
 let runStart = 0;        // πότε ξεκίνησε η τωρινή προσπάθεια
-let endTime = 0;         // πότε πέθανε / νίκησε
+let endTime = 0;         // πότε πέθανε / τελείωσε το επίπεδο
+let monsters = [];
+let killer = null;       // το τέρας που έπιασε τον παίκτη
 let showMap = false;     // βοήθεια για δοκιμές: πλήκτρο M
 
-const player = { x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1 };
+// fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το δόλωμα.
+const player = { x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1 };
 const camera = { x: 0, y: 0 };
 
 // ---- Μέγεθος οθόνης ----
@@ -49,37 +57,7 @@ function resize() {
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
-// ---- Κίνηση & σύγκρουση με τοίχους ----
-function resolveWalls(p) {
-  const r = p.r;
-  const minTx = Math.floor((p.x - r) / TILE), maxTx = Math.floor((p.x + r) / TILE);
-  const minTy = Math.floor((p.y - r) / TILE), maxTy = Math.floor((p.y + r) / TILE);
-  for (let ty = minTy; ty <= maxTy; ty++) {
-    for (let tx = minTx; tx <= maxTx; tx++) {
-      if (!Level.isWall(tx, ty)) continue;
-      const cx = Math.max(tx * TILE, Math.min(p.x, tx * TILE + TILE));
-      const cy = Math.max(ty * TILE, Math.min(p.y, ty * TILE + TILE));
-      const dx = p.x - cx, dy = p.y - cy;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= r * r) continue;
-      if (d2 > 1e-8) {
-        const d = Math.sqrt(d2);
-        p.x += (dx / d) * (r - d);
-        p.y += (dy / d) * (r - d);
-      } else {
-        // Το κέντρο μπήκε μέσα στον τοίχο: βγάλ' το από την κοντινότερη πλευρά.
-        const left = p.x - tx * TILE, right = tx * TILE + TILE - p.x;
-        const top = p.y - ty * TILE, bottom = ty * TILE + TILE - p.y;
-        const m = Math.min(left, right, top, bottom);
-        if (m === left) p.x = tx * TILE - r;
-        else if (m === right) p.x = tx * TILE + TILE + r;
-        else if (m === top) p.y = ty * TILE - r;
-        else p.y = ty * TILE + TILE + r;
-      }
-    }
-  }
-}
-
+// ---- Παίκτης ----
 function updatePlayer(dt) {
   const mx = Input.moveX, my = Input.moveY;
   const amount = Math.hypot(mx, my);
@@ -89,15 +67,22 @@ function updatePlayer(dt) {
     ? RUN_SPEED
     : SNEAK_SPEED * Math.min(1, amount / RUN_THRESHOLD);
   const ux = mx / amount, uy = my / amount;
+  player.fx = ux;
+  player.fy = uy;
 
   const ox = player.x, oy = player.y;
   player.x += ux * speed * dt;
-  resolveWalls(player);
+  Level.pushOutOfWalls(player);
   player.y += uy * speed * dt;
-  resolveWalls(player);
+  Level.pushOutOfWalls(player);
+
+  Hints.notify('move', dt);
+  if (!Input.running) {
+    Hints.notify('sneak', dt);
+    return;
+  }
 
   // Βήματα: μόνο το γρήγορο περπάτημα κάνει θόρυβο.
-  if (!Input.running) return;
   player.stepDist += Math.hypot(player.x - ox, player.y - oy);
   if (player.stepDist >= STEP_LENGTH) {
     player.stepDist -= STEP_LENGTH;
@@ -115,6 +100,15 @@ function emitCall(held) {
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
     'call');
+  Hints.notify('call');
+}
+
+function throwLure() {
+  if (state !== 'play') return;
+  if (Lures.throw(player.x, player.y, player.fx, player.fy, gameTime)) {
+    Hints.notify('lure');
+    updateHud();
+  }
 }
 
 // ---- Σχεδίαση ----
@@ -123,7 +117,7 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (state === 'title') return;
+  if (state === 'menu') return;
 
   const halfW = cssW / 2 / scale, halfH = cssH / 2 / scale;
   const view = {
@@ -138,13 +132,16 @@ function draw() {
 
   Echoes.draw(ctx, gameTime, view, scale);
   ExitDoor.draw(ctx, gameTime);
+  Lures.draw(ctx, gameTime);
 
-  if (state === 'dead') {
-    // Το τέρας φαίνεται ολόκληρο εκεί που σε έπιασε.
-    const t = (gameTime - endTime) / DEATH_DELAY;
-    Monster.draw(ctx, gameTime, Math.max(0.25, 1 - t * 0.6));
-  } else {
-    Monster.draw(ctx, gameTime);
+  for (const m of monsters) {
+    if (state === 'dead' && m === killer) {
+      // Το τέρας φαίνεται ολόκληρο εκεί που σε έπιασε.
+      const t = (gameTime - endTime) / DEATH_DELAY;
+      m.draw(ctx, gameTime, Math.max(0.25, 1 - t * 0.6));
+    } else {
+      m.draw(ctx, gameTime);
+    }
   }
   drawPlayer();
 
@@ -223,10 +220,12 @@ function drawDebugMap() {
   }
   ctx.fillStyle = 'rgba(255,214,150,0.4)';
   ctx.fillRect(Level.exit.tx * TILE, Level.exit.ty * TILE, TILE, TILE);
-  ctx.fillStyle = 'rgba(255,60,60,0.6)';
-  ctx.beginPath();
-  ctx.arc(Monster.x, Monster.y, Monster.r, 0, Math.PI * 2);
-  ctx.fill();
+  for (const m of monsters) {
+    ctx.fillStyle = m.guard ? 'rgba(255,140,60,0.6)' : 'rgba(255,60,60,0.6)';
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 // ---- Βρόχος ----
@@ -239,21 +238,24 @@ function frame(t) {
     gameTime += dt;
     Input.update();
     updatePlayer(dt);
-    Monster.update(dt, gameTime);
+    for (const m of monsters) m.update(dt, gameTime);
+    Lures.update(dt, gameTime);
     Echoes.update(dt, gameTime);
+    Hints.update(gameTime);
 
-    if (Monster.touches(player)) die();
-    else if (ExitDoor.reached(player)) win();
+    killer = monsters.find((m) => m.touches(player)) || null;
+    if (killer) die();
+    else if (ExitDoor.reached(player)) levelCleared();
 
     // Η κάμερα ακολουθεί τον παίκτη απαλά.
     const follow = 1 - Math.pow(0.001, dt);
     camera.x += (player.x - camera.x) * follow;
     camera.y += (player.y - camera.y) * follow;
-  } else if (state === 'dead' || state === 'won') {
+  } else if (state === 'dead') {
     gameTime += dt;
     Echoes.update(dt, gameTime);
-    if (state === 'dead' && gameTime - endTime >= DEATH_DELAY) {
-      gameOverEl.classList.remove('hidden');
+    if (gameTime - endTime >= DEATH_DELAY && screens.gameover.classList.contains('hidden')) {
+      showScreen('gameover');
     }
   }
 
@@ -261,8 +263,53 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
-// ---- Έναρξη / τέλος ----
+// ---- Οθόνες ----
+function showScreen(name) {
+  for (const key in screens) screens[key].classList.toggle('hidden', key !== name);
+  hudEl.classList.toggle('hidden', state !== 'play' && state !== 'paused');
+  if (name === 'menu') buildLevelButtons();
+}
+
+function buildLevelButtons() {
+  const box = $('level-buttons');
+  box.textContent = '';
+  for (let i = 0; i < LEVELS.length; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = String(i + 1);
+    const locked = i + 1 > Progress.unlocked;
+    b.disabled = locked;
+    b.setAttribute('aria-label', locked ? `Level ${i + 1} (locked)` : `Level ${i + 1}`);
+    if (i + 1 === Progress.unlocked) b.classList.add('current');
+    b.addEventListener('click', () => { blurButtons(); startLevel(i); });
+    box.appendChild(b);
+  }
+}
+
+function updateHud() {
+  const total = LEVELS[levelIndex].lures;
+  lureBtn.classList.toggle('invisible', total === 0);   // κρατάει τη θέση του, για να μένει κεντραρισμένο το label
+  lureBtn.classList.toggle('empty', Lures.left === 0);
+  $('lure-count').textContent = String(Lures.left);
+  $('level-label').textContent = `Level ${levelIndex + 1}`;
+}
+
+function showLevelIntro() {
+  const el = $('level-intro');
+  $('intro-number').textContent = `Level ${levelIndex + 1}`;
+  $('intro-name').textContent = LEVELS[levelIndex].name;
+  el.classList.remove('show');
+  void el.offsetWidth;   // ξαναξεκινάει το CSS animation
+  el.classList.add('show');
+}
+
+function blurButtons() {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+// ---- Ροή παιχνιδιού ----
 function goFullscreen() {
+  if (!matchMedia('(pointer: coarse)').matches) return;   // στο PC όχι
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!req || document.fullscreenElement) return;
@@ -283,66 +330,138 @@ function stopInput() {
   Input.joy.id = null;
 }
 
-function die() {
-  state = 'dead';
-  endTime = gameTime;
-  stopInput();
-}
+// Ξεκινάει (ή ξαναξεκινάει) το επίπεδο i (0 = πρώτο).
+function startLevel(i) {
+  goFullscreen();
+  levelIndex = i;
+  const lv = LEVELS[i];
 
-function win() {
-  state = 'won';
-  endTime = gameTime;
-  stopInput();
-  const secs = Math.floor(endTime - runStart);
-  winTimeEl.textContent = `Χρόνος: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  winEl.classList.remove('hidden');
-}
-
-// Ξεκινάει (ή ξαναξεκινάει) το επίπεδο από την αρχή.
-function startGame() {
-  if (state === 'play') return;
-  // Σε κινητό ζητάμε full screen. Στον υπολογιστή όχι, για να μένουν τα devtools άνετα.
-  if (matchMedia('(pointer: coarse)').matches) goFullscreen();
-  titleEl.classList.add('hidden');
-  gameOverEl.classList.add('hidden');
-  winEl.classList.add('hidden');
-  stopInput();   // το Space/Enter που ξεκίνησε το παιχνίδι να μη βγάλει κύμα
-
+  Level.load(lv.map);
   Echoes.init();
+  monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard));
+  killer = null;
+  ExitDoor.reset();
+  Lures.reset(lv.lures);
+  Echoes.listeners = [...monsters, ExitDoor];
+
   player.x = camera.x = Level.start.x;
   player.y = camera.y = Level.start.y;
   player.stepDist = 0;
-  Monster.reset(Level.monsterStart.x, Level.monsterStart.y);
-  ExitDoor.reset();
+  // Αρχική κατεύθυνση: προς τον πρώτο ανοιχτό διάδρομο.
+  const stx = Math.floor(player.x / TILE), sty = Math.floor(player.y / TILE);
+  const open = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
+  [player.fx, player.fy] = open || [0, 1];
 
+  stopInput();
   state = 'play';
   runStart = gameTime;
+  showScreen(null);
+  updateHud();
+  showLevelIntro();
+  Hints.start(lv.hints, gameTime);
+
   // Μια πρώτη ανάσα: ένα μέτριο κύμα για να δεις πού βρίσκεσαι.
   Echoes.emit(player.x, player.y, 220, 0.6, 'call');
 }
 
-// Είναι ανοιχτή κάποια οθόνη που περιμένει "ξεκίνα";
-function menuOpen() {
-  return state === 'title' || state === 'won' ||
-    (state === 'dead' && !gameOverEl.classList.contains('hidden'));
+function die() {
+  state = 'dead';
+  endTime = gameTime;
+  stopInput();
+  Hints.stop();
+  showScreen(null);
 }
 
+function levelCleared() {
+  endTime = gameTime;
+  stopInput();
+  Hints.stop();
+  Progress.unlock(levelIndex + 2);
+
+  if (levelIndex + 1 >= LEVELS.length) {
+    state = 'end';
+    showScreen('end');
+    return;
+  }
+  state = 'cleared';
+  const secs = Math.floor(endTime - runStart);
+  $('cleared-title').textContent = `Level ${levelIndex + 1} cleared`;
+  $('cleared-time').textContent = `Time ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  showScreen('cleared');
+}
+
+function pauseGame() {
+  if (state !== 'play') return;
+  state = 'paused';
+  stopInput();
+  showScreen('pause');
+}
+
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = 'play';
+  showScreen(null);
+}
+
+function goToMenu() {
+  state = 'menu';
+  stopInput();
+  Hints.stop();
+  showScreen('menu');
+}
+
+function doAction(action) {
+  blurButtons();
+  if (action === 'play') startLevel(Progress.unlocked - 1);
+  else if (action === 'resume') resumeGame();
+  else if (action === 'restart') startLevel(levelIndex);
+  else if (action === 'next') startLevel(levelIndex + 1);
+  else if (action === 'menu') goToMenu();
+}
+
+// Η ορατή οθόνη (αν υπάρχει) και το κύριο κουμπί της.
+function visibleScreen() {
+  for (const key in screens) {
+    if (!screens[key].classList.contains('hidden')) return screens[key];
+  }
+  return null;
+}
+
+// ---- Έναρξη ----
 function init() {
-  Level.load(LEVEL_1);
-  Echoes.init();
-  Echoes.listeners.push(Monster, ExitDoor);
+  Progress.load();
+  Hints.init($('hint'));
 
   Input.now = () => gameTime;
   Input.onRelease = emitCall;
   Input.init(canvas);
 
-  titleEl.addEventListener('pointerup', (e) => { e.preventDefault(); startGame(); });
-  for (const btn of document.querySelectorAll('.again')) {
-    btn.addEventListener('click', (e) => { e.preventDefault(); startGame(); });
+  for (const btn of document.querySelectorAll('[data-action]')) {
+    btn.addEventListener('click', (e) => { e.preventDefault(); doAction(btn.dataset.action); });
   }
+  $('btn-pause').addEventListener('pointerdown', (e) => { e.preventDefault(); pauseGame(); });
+  lureBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); throwLure(); });
+
   window.addEventListener('keydown', (e) => {
-    if (menuOpen() && (e.code === 'Enter' || e.code === 'Space')) startGame();
-    if (e.code === 'KeyM') showMap = !showMap;
+    if (e.code === 'Enter') {
+      // Enter = το κύριο κουμπί της οθόνης που φαίνεται.
+      e.preventDefault();
+      const scr = visibleScreen();
+      const primary = scr && scr.querySelector('.primary');
+      if (primary) doAction(primary.dataset.action);
+    } else if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (state === 'play') pauseGame();
+      else if (state === 'paused') resumeGame();
+    } else if (e.code === 'KeyE' && !e.repeat) {
+      throwLure();
+    } else if (e.code === 'KeyM') {
+      showMap = !showMap;
+    }
+  });
+
+  // Αν η σελίδα κρυφτεί (π.χ. έρχεται κλήση), το παιχνίδι μπαίνει σε παύση.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pauseGame();
   });
 
   // Κλείδωμα zoom / scroll / μενού στα κινητά.
@@ -352,6 +471,7 @@ function init() {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   resize();
+  showScreen('menu');
   requestAnimationFrame(frame);
 }
 

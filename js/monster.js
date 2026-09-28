@@ -9,32 +9,32 @@ const MONSTER_SEARCH_TIME = 5;
 const MONSTER_MUFFLED_RANGE = 0.6;
 // Πόσο φαίνεται η κόκκινη λάμψη όταν το ακουμπήσει κύμα (δευτ.).
 const MONSTER_REVEAL_TIME = 1.5;
+// Ο φρουρός περιφέρεται μόνο τόσα κελιά γύρω από τη θέση του.
+const GUARD_RANGE = 4;
 
-const Monster = {
-  x: 0,
-  y: 0,
-  r: MONSTER_RADIUS,
-  state: 'wander',      // 'wander' | 'hunt' | 'search'
-  path: [],             // λίστα από [tx, ty] προς επίσκεψη
-  soundX: 0,            // πού άκουσε τον τελευταίο ήχο
-  soundY: 0,
-  searchUntil: 0,
-
-  // Η λάμψη δείχνει πού ήταν το τέρας τη στιγμή που το βρήκε το κύμα,
-  // όχι πού είναι τώρα.
-  revealX: 0,
-  revealY: 0,
-  revealTime: -1e6,
-  revealStrength: 0,
-  revealSeed: 0,
-
-  reset(x, y) {
+class Monster {
+  // guard = true: όταν δεν κυνηγάει, γυρίζει και φυλάει κοντά στο σημείο εκκίνησης.
+  constructor(x, y, guard) {
     this.x = x;
     this.y = y;
-    this.state = 'wander';
-    this.path = [];
+    this.r = MONSTER_RADIUS;
+    this.guard = guard;
+    this.homeTx = Math.floor(x / TILE);
+    this.homeTy = Math.floor(y / TILE);
+    this.state = 'wander';     // 'wander' | 'hunt' | 'search'
+    this.path = [];            // λίστα από [tx, ty] προς επίσκεψη
+    this.soundX = 0;           // πού άκουσε τον τελευταίο ήχο
+    this.soundY = 0;
+    this.searchUntil = 0;
+
+    // Η λάμψη δείχνει πού ήταν το τέρας τη στιγμή που το βρήκε το κύμα,
+    // όχι πού είναι τώρα.
+    this.revealX = 0;
+    this.revealY = 0;
     this.revealTime = -1e6;
-  },
+    this.revealStrength = 0;
+    this.revealSeed = 0;
+  }
 
   // Καλείται από το Echoes όταν ένα κύμα φτάσει το τέρας.
   onHear(wave, d, los) {
@@ -57,19 +57,19 @@ const Monster = {
     this.soundX = wave.x;
     this.soundY = wave.y;
     this.goTo(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE));
-  },
+  }
 
   revealAlpha(now) {
     const age = now - this.revealTime;
     if (age >= MONSTER_REVEAL_TIME) return 0;
     return this.revealStrength * (1 - age / MONSTER_REVEAL_TIME);
-  },
+  }
 
   goTo(tx, ty) {
     const cx = Math.floor(this.x / TILE), cy = Math.floor(this.y / TILE);
     // Πρώτα στο κέντρο του τωρινού κελιού, ώστε να μην κόβει γωνίες τοίχων.
     this.path = [[cx, cy], ...Level.findPath(cx, cy, tx, ty)];
-  },
+  }
 
   pickNextGoal(now) {
     const cx = Math.floor(this.x / TILE), cy = Math.floor(this.y / TILE);
@@ -91,9 +91,11 @@ const Monster = {
       }
     }
 
-    const [tx, ty] = Level.randomFloorNear(cx, cy, 4, 12);
+    const [tx, ty] = this.guard
+      ? Level.randomFloorNear(this.homeTx, this.homeTy, 0, GUARD_RANGE)
+      : Level.randomFloorNear(cx, cy, 4, 12);
     this.goTo(tx, ty);
-  },
+  }
 
   update(dt, now) {
     if (this.path.length === 0) this.pickNextGoal(now);
@@ -115,13 +117,13 @@ const Monster = {
         step = 0;
       }
     }
-  },
+  }
 
   touches(p) {
     return Math.hypot(p.x - this.x, p.y - this.y) < p.r + this.r;
-  },
+  }
 
-  // Κόκκινη λάμψη. Αν forceAlpha δοθεί, σχεδιάζεται στην πραγματική θέση (π.χ. Game Over).
+  // Κόκκινη λάμψη. Αν δοθεί forceAlpha, σχεδιάζεται στην πραγματική θέση (π.χ. Game Over).
   draw(ctx, now, forceAlpha) {
     let a, x, y, seed;
     if (forceAlpha !== undefined) {
@@ -153,5 +155,5 @@ const Monster = {
     }
     ctx.closePath();
     ctx.fill();
-  },
-};
+  }
+}
