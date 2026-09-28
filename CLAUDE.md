@@ -135,7 +135,9 @@
 
 ## Δοκιμή
 - PC: διπλό κλικ στο `index.html`.
-- Κινητό: μέσω GitHub Pages (ή οποιουδήποτε στατικού server στο ίδιο Wi-Fi).
+- Κινητό: https://fanistsob2001.github.io/silent-escape/ (GitHub Pages από το
+  `main`, repo `fanistsob2001/silent-escape`). Κάθε `git push` στο `main`
+  ενημερώνει τη σελίδα σε ~1 λεπτό.
 - Αυτόματες δοκιμές στο browser pane: αν το pane είναι κρυφό, το
   `requestAnimationFrame` σταματάει — προχώρα το παιχνίδι καλώντας `frame(t)`
   με δικούς σου χρόνους (π.χ. 60 φορές το δευτ. για 1 δευτ. παιχνιδιού).
