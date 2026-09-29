@@ -61,6 +61,10 @@ const STORY = {
   whisper: "Orpheus...",
   footstepsStop: "The footsteps behind you stop.",
 
+  // Easter eggs (STORY.md, ενότητα 9).
+  stuckShade: "I have been walking into this wall for three thousand years.",
+  cerberus: "Good boy. Good boy. Good boy.",
+
   // Επιλογές μετά το κακό τέλος (STORY.md, ενότητα 5).
   tryAgain: 'Try again from the last checkpoint',
   mainMenu: 'Main menu',

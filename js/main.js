@@ -230,6 +230,7 @@ function draw() {
   ExitDoor.draw(ctx, gameTime);
   Items.draw(ctx, gameTime, view);
   Souls.draw(ctx, gameTime, view);
+  Eggs.draw(ctx, gameTime, view);
   Charon.draw(ctx, gameTime);
   Jars.draw(ctx, gameTime);
   Melody.draw(ctx, gameTime);
@@ -351,6 +352,7 @@ function frame(t) {
     updatePlayer(dt);
     for (const m of monsters) m.update(dt, gameTime);
     Jars.update(dt, gameTime);
+    Eggs.update(dt, gameTime);
     Echoes.update(dt, gameTime);
     Hints.update(gameTime);
     Notice.update(gameTime);
@@ -511,9 +513,10 @@ function spawn(saved) {
   Melody.reset(saved.melody);
   Notice.clear();
   Souls.reset();
+  Eggs.reset();
   // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
   Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
-  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list];
+  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners()];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;

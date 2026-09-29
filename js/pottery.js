@@ -231,6 +231,124 @@ const Pottery = {
     ctx.restore();
   },
 
+  // Ο Κέρβερος ξαπλωμένος, κοιτάζει δεξιά: σώμα, μπροστινά πόδια απλωμένα, τρία
+  // κεφάλια το ένα πάνω από το άλλο, ουρά-φίδι. (x, y) = το έδαφος στη μέση, L = μήκος.
+  // barking[i] = true όταν το κεφάλι i γαβγίζει (0 = μπροστινό/χαμηλό, 2 = πίσω/ψηλό):
+  // τότε ανοίγει το στόμα και το μάτι του. breath = 0..1, πολύ ήπια ανάσα στον ύπνο.
+  cerberus(ctx, x, y, L, alpha, barking, breath) {
+    const fill = this.rgba(POT.terra, alpha);
+    const b = 1 + 0.03 * breath;
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Ουρά-φίδι που κουλουριάζεται πίσω.
+    ctx.strokeStyle = fill;
+    ctx.lineWidth = L * 0.03;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-0.36 * L, -0.14 * L);
+    ctx.quadraticCurveTo(-0.55 * L, -0.12 * L, -0.5 * L, -0.28 * L);
+    ctx.quadraticCurveTo(-0.45 * L, -0.4 * L, -0.56 * L, -0.42 * L);
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(-0.55 * L, -0.45 * L);
+    ctx.lineTo(-0.63 * L, -0.42 * L);
+    ctx.lineTo(-0.55 * L, -0.39 * L);
+    ctx.fill();
+
+    // Σώμα και πίσω πόδι.
+    ctx.beginPath();
+    ctx.ellipse(-0.1 * L, -0.15 * L * b, 0.3 * L, 0.14 * L * b, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-0.3 * L, -0.08 * L, 0.12 * L, 0.08 * L, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Μπροστινά πόδια απλωμένα μπροστά, με τα κεφάλια ακουμπισμένα πάνω τους.
+    ctx.beginPath();
+    ctx.moveTo(0.05 * L, -0.07 * L);
+    ctx.lineTo(0.46 * L, -0.05 * L);
+    ctx.quadraticCurveTo(0.5 * L, -0.02 * L, 0.46 * L, 0);
+    ctx.lineTo(0.05 * L, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Χαραγμένα πλευρά και κολάρο.
+    if (alpha > 0.3) {
+      for (const k of [-0.2, -0.1, 0]) {
+        this.incise(ctx, [k * L - 0.03 * L, -0.24 * L, k * L + 0.02 * L, -0.08 * L], L * 0.5);
+      }
+      this.incise(ctx, [0.36 * L, -0.03 * L, 0.36 * L, 0], L * 0.4);
+      this.incise(ctx, [0.42 * L, -0.03 * L, 0.42 * L, 0], L * 0.4);
+    }
+
+    // Τα τρία κεφάλια: από το πίσω (ψηλό) προς το μπροστινό (χαμηλό).
+    const heads = [
+      { hx: 0.33, hy: -0.11 },   // 0: μπροστινό, χαμηλό
+      { hx: 0.27, hy: -0.23 },   // 1: μεσαίο
+      { hx: 0.19, hy: -0.35 },   // 2: πίσω, ψηλό
+    ];
+    for (let i = 2; i >= 0; i--) {
+      const barkNow = barking && barking[i];
+      const hx = heads[i].hx * L, hy = (heads[i].hy - (barkNow ? 0.03 : 0)) * L;
+      ctx.fillStyle = fill;
+      // Λαιμός από τους ώμους ως το κεφάλι.
+      ctx.beginPath();
+      ctx.moveTo(0.05 * L, -0.22 * L);
+      ctx.lineTo(hx - 0.02 * L, hy - 0.05 * L);
+      ctx.lineTo(hx + 0.01 * L, hy + 0.05 * L);
+      ctx.lineTo(0.12 * L, -0.08 * L);
+      ctx.closePath();
+      ctx.fill();
+      // Κρανίο, αυτί, μουσούδα.
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, 0.085 * L, 0.062 * L, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(hx - 0.05 * L, hy - 0.04 * L);
+      ctx.lineTo(hx - 0.075 * L, hy - 0.13 * L);
+      ctx.lineTo(hx + 0.005 * L, hy - 0.055 * L);
+      ctx.fill();
+      ctx.beginPath();
+      if (barkNow) {
+        // Ανοιχτό στόμα: πάνω σαγόνι σηκωμένο, κάτω σαγόνι κατεβασμένο.
+        ctx.moveTo(hx + 0.04 * L, hy - 0.03 * L);
+        ctx.lineTo(hx + 0.17 * L, hy - 0.05 * L);
+        ctx.lineTo(hx + 0.16 * L, hy - 0.01 * L);
+        ctx.lineTo(hx + 0.05 * L, hy + 0.005 * L);
+        ctx.lineTo(hx + 0.14 * L, hy + 0.05 * L);
+        ctx.lineTo(hx + 0.12 * L, hy + 0.075 * L);
+        ctx.lineTo(hx + 0.03 * L, hy + 0.05 * L);
+      } else {
+        ctx.moveTo(hx + 0.04 * L, hy - 0.03 * L);
+        ctx.lineTo(hx + 0.16 * L, hy - 0.005 * L);
+        ctx.lineTo(hx + 0.155 * L, hy + 0.03 * L);
+        ctx.lineTo(hx + 0.04 * L, hy + 0.045 * L);
+      }
+      ctx.closePath();
+      ctx.fill();
+      // Μάτι: κλειστό (χαραγμένο τόξο) όταν κοιμάται, ανοιχτό όταν γαβγίζει.
+      if (barkNow) {
+        ctx.fillStyle = this.rgba(POT.cream, alpha);
+        ctx.beginPath();
+        ctx.arc(hx + 0.025 * L, hy - 0.015 * L, 0.012 * L, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (alpha > 0.3) {
+        ctx.strokeStyle = this.rgba(POT.black, 0.9);
+        ctx.lineWidth = Math.max(0.8, L * 0.008);
+        ctx.beginPath();
+        ctx.arc(hx + 0.025 * L, hy - 0.02 * L, 0.014 * L, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+      }
+      // Περίγραμμα, ώστε τα κεφάλια να ξεχωρίζουν μεταξύ τους.
+      ctx.strokeStyle = this.rgba(POT.black, 0.85);
+      ctx.lineWidth = Math.max(0.8, L * 0.008);
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, 0.085 * L, 0.062 * L, 0, Math.PI * 0.6, Math.PI * 1.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
   // Γοργόνειο: μετωπικό πρόσωπο-τέρας, όπως στον πάτο των αρχαίων κυλίκων —
   // εδώ είναι το πρόσωπο μιας σκιάς για το jump scare. Μαύρη μορφή πάνω σε
   // κύκλο από πηλό, με χαραγμένες λεπτομέρειες. (cx, cy) κέντρο, R ακτίνα.

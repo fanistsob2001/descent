@@ -20,6 +20,8 @@ const Level = {
   items: [],           // { kind: 'obol' | 'string' | 'jar', x, y, region } — ο δείκτης είναι το id
   gates: [],           // { tx, ty, x, y, open } — η βάρκα του Χάροντα
   souls: [],           // { n, x, y } — μηνύματα χαμένων ψυχών (1..6)
+  eggs: {},            // easter eggs: { stuck: { x, y }, cerberus: { x, y } }
+  quiet: null,         // Uint8Array: κελιά όπου οι σκιές δεν πάνε ποτέ να περιπλανηθούν
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -53,6 +55,7 @@ const Level = {
     this.items = [];
     this.gates = [];
     this.souls = [];
+    this.eggs = {};
 
     let top = 0;
     chapters.forEach((ch, r) => {
@@ -72,6 +75,8 @@ const Level = {
           const kind = { o: 'obol', s: 'string', j: 'jar' }[c];
           if (kind) this.items.push({ kind, x: cx, y: cy, region: r });
           if (c >= '1' && c <= '6') this.souls.push({ n: Number(c), x: cx, y: cy });
+          if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
+          if (c === 'D') this.eggs.cerberus = { x: cx, y: cy };
         }
       });
       top += ch.map.length;
@@ -79,6 +84,17 @@ const Level = {
 
     // Τα κομμάτια χτίζονται με τις πύλες ανοιχτές (ώστε να υπάρχουν οι πλευρές
     // των γειτονικών τοίχων) — οι ίδιες οι πύλες παίρνουν δικά τους κομμάτια.
+    // Το δωμάτιο του Κέρβερου μένει ήσυχο: καμία σκιά δεν το διαλέγει για περιπλάνηση.
+    this.quiet = new Uint8Array(this.cols * this.rows);
+    if (this.eggs.cerberus) {
+      const ctx = Math.floor(this.eggs.cerberus.x / TILE), cty = Math.floor(this.eggs.cerberus.y / TILE);
+      for (let y = cty - 2; y <= cty + 2; y++) {
+        for (let x = ctx - 3; x <= ctx + 2; x++) {
+          if (x >= 0 && y >= 0 && x < this.cols && y < this.rows) this.quiet[y * this.cols + x] = 1;
+        }
+      }
+    }
+
     this.buildSegments();
     this.segBaseFade = new Float32Array(this.segCount);
     for (let i = 0; i < this.segCount; i++) {
@@ -195,6 +211,7 @@ const Level = {
     for (let i = 0; i < dist.length; i++) {
       if (dist[i] < minSteps || dist[i] > maxSteps) continue;
       if (region !== undefined && this.region[i] !== region) continue;
+      if (this.quiet[i]) continue;
       const tx = i % this.cols, ty = (i / this.cols) | 0;
       if (tx === this.exit.tx && ty === this.exit.ty) continue;
       // Ούτε στις ενώσεις ανάμεσα στα κεφάλαια (τα κελιά ^ / v πάνω στα τείχη).

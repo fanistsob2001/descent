@@ -476,6 +476,63 @@ const Sound = {
     this.pluck(notes[i % notes.length], this.ctx.currentTime, 0.22);
   },
 
+  // Easter egg A: η σκιά χτυπάει στον τοίχο — ένα κούφιο "μπονκ".
+  // Ακούγεται μόνο αν είσαι κοντά (αλλιώς θα αντηχούσε σε όλο τον χάρτη).
+  bonk(x, y) {
+    if (!this.ready()) return;
+    const d = Math.hypot(x - this.listenerX, y - this.listenerY);
+    if (d > 360) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.45 * (1 - d / 360), 360);
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(190, t);
+    o.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.5, 0.004, 0.16);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.22);
+  },
+
+  // Easter egg B: ένα γάβγισμα του Κέρβερου (freq = πόσο βαθύ), μετά από delay δευτ.
+  // Δεν είναι κύμα του παιχνιδιού — οι σκιές δεν το ακούνε.
+  bark(x, y, freq, delay) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime + delay;
+    const out = this.spatial(x, y, 0.9, 600);
+    // Φωνή: πριονωτός τόνος που πέφτει απότομα, μέσα από φίλτρο "στόματος".
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(freq * 1.5, t);
+    o.frequency.exponentialRampToValueAtTime(freq, t + 0.05);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.7, t + 0.2);
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = freq * 3.2;
+    bp.Q.value = 1.4;
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.5, 0.01, 0.2);
+    o.connect(bp);
+    bp.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.3);
+    // Λίγη "ανάσα" στην αρχή του γαβγίσματος.
+    const n = this.noiseSource();
+    const hp = ac.createBiquadFilter();
+    hp.type = 'bandpass';
+    hp.frequency.value = freq * 6;
+    const ng = ac.createGain();
+    this.envelope(ng.gain, t, 0.18, 0.005, 0.08);
+    n.connect(hp);
+    hp.connect(ng);
+    ng.connect(out);
+    n.start(t, Math.random());
+    n.stop(t + 0.12);
+  },
+
   // Ο Χάροντας δεν παίρνει τίποτα: χαμηλό, κούφιο μουρμουρητό.
   charonRefuse() {
     if (!this.ready()) return;
