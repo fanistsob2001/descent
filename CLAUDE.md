@@ -42,7 +42,7 @@
 - `index.html` — canvas, HUD, οθόνες (menu, settings, pause, end), rotate
 - `css/style.css` — full screen, κλείδωμα scroll/zoom/επιλογής, οθόνες, HUD
 - `js/levels.js` — `CHAPTERS`: τα 5 κεφάλαια (numeral, name, line, objective(strings),
-  lures, fade, hints, map). Χάρτης: `#` τοίχος, `.` διάδρομος, `S` αφετηρία (μόνο I),
+  fade, hints, map). Χάρτης: `#` τοίχος, `.` διάδρομος, `S` αφετηρία (μόνο I),
   `^` είσοδος από το προηγούμενο κεφάλαιο (πάνω τείχος), `v` έξοδος προς το
   επόμενο (κάτω τείχος), `w` σαν το `v` αλλά κλειστό (η βάρκα του Χάροντα), `C` βωμός,
   `M` σκιά, `G` σκιά-φρουρός, `E` τελική έξοδος (μόνο V), `o` οβολός, `s` χορδή, `j` αγγείο.
