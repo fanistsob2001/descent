@@ -17,6 +17,15 @@ const VIEW_MIN_H = 700;
 // πριν ο παίκτης ξαναβγεί στον τελευταίο βωμό (δευτ.).
 const DEATH_DELAY = 1.7;
 
+// Οδηγίες χειρισμού (όχι κείμενα της ιστορίας): πώς πετάς αγγείο / παίζεις τη Μελωδία.
+const JAR_HINTS = [
+  { touch: 'Tap the jar button at the top right to throw it where you are heading.',
+    keys: 'Press E to throw the jar where you are heading.', until: 'jar', time: 10 },
+];
+const MELODY_HINTS = [
+  { touch: 'Tap the lyre button to play.', keys: 'Press Q to play the lyre.', until: 'melody', time: 10 },
+];
+
 // Ένταση του ambient βουητού ανά κατάσταση.
 const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, end: 0.5 };
 
@@ -28,14 +37,17 @@ const screens = {
   menu: $('menu'), settings: $('settings'), pause: $('pause'), end: $('end'),
 };
 const hudEl = $('hud');
-const lureBtn = $('btn-lure');
+const jarBtn = $('btn-jar');
+const melodyBtn = $('btn-melody');
 
 // ---- Κατάσταση ----
 let cssW = 0, cssH = 0, dpr = 1, scale = 1;
 // 'menu' | 'play' | 'paused' | 'dead' | 'end'
 let state = 'menu';
 let chapter = -1;        // ο τελευταίος βωμός που άναψε (-1 = κανένας ακόμα)
-let strings = 0;         // χορδές της λύρας (στάδιο 2)
+let strings = 0;         // χορδές της λύρας (0..3)
+let hasObol = false;     // έχει οβολό (για τον Χάροντα)
+let jarsFound = false;   // έχει βρει ήδη αγγείο (για να φανεί η οδηγία ρίψης μόνο μία φορά)
 let hudRegion = -1;      // σε ποιο κεφάλαιο δείχνει τώρα το HUD
 let gameTime = 0;
 let lastFrame = 0;
@@ -44,7 +56,7 @@ let monsters = [];
 let killer = null;       // η σκιά που έπιασε τον παίκτη
 let showMap = false;     // βοήθεια για δοκιμές: πλήκτρο M
 
-// fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το δόλωμα.
+// fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το αγγείο.
 const player = { x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1 };
 const camera = { x: 0, y: 0 };
 
@@ -110,12 +122,58 @@ function emitCall(held) {
   Hints.notify('call');
 }
 
-function throwLure() {
+function throwJar() {
   if (state !== 'play') return;
-  if (Lures.throw(player.x, player.y, player.fx, player.fy, gameTime)) {
-    Sound.lureThrow();
-    Hints.notify('lure');
+  if (Jars.throw(player.x, player.y, player.fx, player.fy)) {
+    Sound.jarThrow();
+    Hints.notify('jar');
     updateHud();
+  }
+}
+
+function playMelody() {
+  if (state !== 'play' || strings < 3) return;
+  if (Melody.play(player, monsters, gameTime) >= 0) {
+    Hints.notify('melody');
+    updateHud();
+  }
+}
+
+// Ο παίκτης μάζεψε ένα αντικείμενο.
+function pickUp(it) {
+  if (it.kind === 'jar') {
+    Jars.left++;
+    Sound.jarPickup();
+    Notice.show('A libation jar. The dead hunger for offerings. Throw it, and they will come.', gameTime, 6);
+    if (!jarsFound) Hints.push(JAR_HINTS);
+    jarsFound = true;
+  } else if (it.kind === 'obol') {
+    hasObol = true;
+    Sound.coin();
+  } else if (it.kind === 'string') {
+    strings = Math.min(3, strings + 1);
+    Sound.stringFound(strings);
+    if (strings < 3) {
+      Notice.show(`You found a string (${strings}/3).`, gameTime, 4);
+    } else {
+      Notice.show('Your lyre is whole again. When you play, the shades remember they were once alive.', gameTime, 7);
+      Melody.uses = MELODY_USES;
+      Hints.push(MELODY_HINTS);
+    }
+  }
+  updateHud();
+}
+
+// Ο Χάροντας στην πύλη του κεφαλαίου II.
+function checkCharon() {
+  const r = Charon.check(player, hasObol, gameTime);
+  if (r === 'empty') {
+    Notice.show('Charon holds out his hand. Yours is empty.', gameTime, 5);
+    Sound.charonRefuse();
+  } else if (r === 'paid') {
+    hasObol = false;
+    Notice.show('The obol clinks into his palm. The boat begins to move.', gameTime, 6);
+    Sound.charonPaid();
   }
 }
 
@@ -151,7 +209,10 @@ function draw() {
   Echoes.draw(ctx, gameTime, view, scale);
   Altars.draw(ctx, gameTime, view);
   ExitDoor.draw(ctx, gameTime);
-  Lures.draw(ctx, gameTime);
+  Items.draw(ctx, gameTime, view);
+  Charon.draw(ctx, gameTime);
+  Jars.draw(ctx, gameTime);
+  Melody.draw(ctx, gameTime);
 
   for (const m of monsters) {
     if (state === 'dead' && m === killer) {
@@ -263,15 +324,19 @@ function frame(t) {
     Input.update();
     updatePlayer(dt);
     for (const m of monsters) m.update(dt, gameTime);
-    Lures.update(dt, gameTime);
+    Jars.update(dt, gameTime);
     Echoes.update(dt, gameTime);
     Hints.update(gameTime);
+    Notice.update(gameTime);
 
     killer = monsters.find((m) => m.touches(player)) || null;
     const lit = killer ? -1 : Altars.check(player, gameTime);
+    const item = killer ? null : Items.check(player);
     if (killer) die();
     else if (lit >= 0) lightAltar(lit);
     else if (ExitDoor.reached(player)) reachedExit();
+    if (item) pickUp(item);
+    if (state === 'play') checkCharon();
 
     const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
     if (region !== hudRegion) updateHud();
@@ -327,14 +392,18 @@ function updateToggleLabels() {
 }
 
 function updateHud() {
-  // Το κουμπί του δολώματος εμφανίζεται από το κεφάλαιο που δίνει τα πρώτα δολώματα.
-  const hasLures = Lures.left > 0 || CHAPTERS.slice(0, chapter + 1).some((c) => c.lures > 0);
-  lureBtn.classList.toggle('invisible', !hasLures);   // κρατάει τη θέση του, για να μένει κεντραρισμένο το label
-  lureBtn.classList.toggle('empty', Lures.left === 0);
-  $('lure-count').textContent = String(Lures.left);
+  // Το κουμπί του αγγείου εμφανίζεται μόλις βρεις το πρώτο· της λύρας με την 3η χορδή.
+  jarBtn.classList.toggle('hidden', !jarsFound);
+  jarBtn.classList.toggle('empty', Jars.left === 0);
+  $('jar-count').textContent = String(Jars.left);
+  melodyBtn.classList.toggle('hidden', strings < 3);
+  melodyBtn.classList.toggle('empty', Melody.uses === 0);
+  $('melody-count').textContent = String(Melody.uses);
   const r = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
   hudRegion = r;
   $('level-label').textContent = r >= 0 ? CHAPTERS[r].numeral : '';
+  // Οι χορδές φαίνονται από το κεφάλαιο II (εκεί βρίσκεται η πρώτη).
+  $('strings-label').textContent = Math.max(r, chapter) >= 1 || strings > 0 ? `Strings: ${strings}/3` : '';
 }
 
 // Τίτλος κεφαλαίου στη μέση της οθόνης (καλείται από την ουρά μηνυμάτων).
@@ -392,20 +461,26 @@ function chapterMessages(i) {
   ];
 }
 
-// Βάζει τον παίκτη στον κόσμο με την κατάσταση ενός save.
-// saved = { chapter, lures } — chapter -1 = καινούργιο παιχνίδι (από την αφετηρία).
+// Βάζει τον παίκτη στον κόσμο με την κατάσταση ενός save (βλ. Save.fresh()).
+// chapter -1 = καινούργιο παιχνίδι (από την αφετηρία).
 function spawn(saved) {
   goFullscreen();
   chapter = saved.chapter;
-  strings = 0;   // οι χορδές έρχονται στο στάδιο 2
+  strings = saved.strings;
+  hasObol = saved.obol;
+  jarsFound = saved.jars > 0 || saved.taken.some((id) => Level.items[id] && Level.items[id].kind === 'jar');
 
   Echoes.init();
   monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard, m.region));
   killer = null;
   ExitDoor.reset();
   Altars.reset(chapter);
-  Lures.reset(saved.lures);
-  Echoes.listeners = [...monsters, ExitDoor, ...Altars.list];
+  Items.reset(saved.taken);
+  Charon.reset(saved.paid);
+  Jars.reset(saved.jars);
+  Melody.reset(saved.melody);
+  Notice.clear();
+  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;
@@ -434,18 +509,22 @@ function spawn(saved) {
 
 function newGame() {
   Save.clear();
-  spawn({ chapter: -1, lures: 0 });
+  spawn(Save.fresh());
 }
 
 function continueGame() {
-  spawn(Save.load() || { chapter: -1, lures: 0 });
+  spawn(Save.load() || Save.fresh());
 }
 
-// Ο παίκτης έφτασε στον βωμό του κεφαλαίου i.
+// Ο παίκτης έφτασε στον βωμό του κεφαλαίου i: η Μελωδία ξαναγεμίζει και
+// αποθηκεύονται όλα όπως είναι τώρα.
 function lightAltar(i) {
   chapter = i;
-  Lures.left = Math.max(Lures.left, CHAPTERS[i].lures);
-  Save.write({ chapter: i, lures: Lures.left });
+  if (strings >= 3) Melody.uses = MELODY_USES;
+  Save.write({
+    chapter: i, jars: Jars.left, strings, obol: hasObol, paid: Charon.paid,
+    melody: Melody.uses, taken: Items.takenIds(),
+  });
   Sound.win();
   updateHud();
   Hints.start(chapterMessages(i), gameTime);
@@ -456,6 +535,7 @@ function die() {
   endTime = gameTime;
   stopInput();
   Hints.stop();
+  Notice.clear();
   showScreen(null);
   Scare.prepare();
   Sound.scare();
@@ -467,6 +547,7 @@ function reachedExit() {
   setState('end');
   stopInput();
   Hints.stop();
+  Notice.clear();
   Sound.win();
   showScreen('end');
 }
@@ -488,6 +569,7 @@ function goToMenu() {
   setState('menu');
   stopInput();
   Hints.stop();
+  Notice.clear();
   showScreen('menu');
 }
 
@@ -523,6 +605,7 @@ function init() {
   Sound.loadSettings();
   updateToggleLabels();
   Hints.init($('hint'));
+  Notice.init($('notice'));
   Hints.onTitle = showChapterTitle;
 
   Level.loadWorld(CHAPTERS);
@@ -537,7 +620,8 @@ function init() {
     btn.addEventListener('click', (e) => { e.preventDefault(); doAction(btn.dataset.action); });
   }
   $('btn-pause').addEventListener('pointerdown', (e) => { e.preventDefault(); pauseGame(); });
-  lureBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); throwLure(); });
+  jarBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); throwJar(); });
+  melodyBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); playMelody(); });
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
@@ -550,7 +634,9 @@ function init() {
       if (state === 'play') pauseGame();
       else if (state === 'paused') resumeGame();
     } else if (e.code === 'KeyE' && !e.repeat) {
-      throwLure();
+      throwJar();
+    } else if (e.code === 'KeyQ' && !e.repeat) {
+      playMelody();
     } else if (e.code === 'KeyM') {
       showMap = !showMap;
     }

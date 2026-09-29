@@ -4,15 +4,29 @@
 // (π.χ. ιδιωτική περιήγηση), το παιχνίδι δουλεύει κανονικά χωρίς αποθήκευση.
 
 // Μία μόνο θέση αποθήκευσης: η κατάσταση τη στιγμή που άναψε ο τελευταίος βωμός.
-// { chapter: 0..4, lures }
+// { chapter: 0..4, jars, strings, obol, paid, melody, taken: [id αντικειμένων] }
 const Save = {
   KEY: 'descent-save',
+
+  // Η κατάσταση ενός καινούργιου παιχνιδιού (chapter -1 = πριν τον πρώτο βωμό).
+  fresh() {
+    return { chapter: -1, jars: 0, strings: 0, obol: false, paid: false, melody: 0, taken: [] };
+  },
 
   load() {
     try {
       const d = JSON.parse(localStorage.getItem(this.KEY));
       if (d && Number.isInteger(d.chapter) && d.chapter >= 0 && d.chapter < CHAPTERS.length) {
-        return { chapter: d.chapter, lures: Number.isInteger(d.lures) ? d.lures : 0 };
+        const int = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
+        return {
+          chapter: d.chapter,
+          jars: int(d.jars),
+          strings: Math.min(3, int(d.strings)),
+          obol: d.obol === true,
+          paid: d.paid === true,
+          melody: int(d.melody),
+          taken: Array.isArray(d.taken) ? d.taken.filter(Number.isInteger) : [],
+        };
       }
     } catch (_) { /* χωρίς αποθήκευση */ }
     return null;

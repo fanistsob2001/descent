@@ -30,6 +30,8 @@ const Dread = {
     const voices = [];
     if (active) {
       for (const m of monsters) {
+        // Παγωμένη από τη Μελωδία: σιωπηλή και ακίνδυνη.
+        if (m.isFrozen()) { voices.push(null); continue; }
         const d = Math.hypot(m.x - player.x, m.y - player.y);
         target = Math.max(target, 1 - (d - DREAD_NEAR) / (DREAD_FAR - DREAD_NEAR));
         voices.push({ x: m.x, y: m.y, los: Level.lineOfSight(player.x, player.y, m.x, m.y) });

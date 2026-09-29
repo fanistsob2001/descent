@@ -17,6 +17,8 @@ const Level = {
   start: { x: 0, y: 0 },
   monsters: [],        // { x, y, guard, region } — θέσεις εκκίνησης των σκιών
   altars: [],          // { x, y, tx, ty } — ένας βωμός ανά κεφάλαιο, με τη σειρά
+  items: [],           // { kind: 'obol' | 'string' | 'jar', x, y, region } — ο δείκτης είναι το id
+  gates: [],           // { tx, ty, x, y, open } — η βάρκα του Χάροντα
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -25,16 +27,18 @@ const Level = {
   // Σημείο ελέγχου κάθε κομματιού: λίγο έξω από τον τοίχο, μέσα στον διάδρομο,
   // ώστε ο έλεγχος οπτικής επαφής να μην "χτυπάει" τον ίδιο τον τοίχο.
   testX: null, testY: null,
-  segFade: null,       // σε πόσα δευτ. σβήνει κάθε κομμάτι (Λήθη = πιο γρήγορα)
+  segFade: null,       // σε πόσα δευτ. σβήνει κάθε κομμάτι (Λήθη = πιο γρήγορα), 0 = ανενεργό
+  segBaseFade: null,
+  segGate: null,       // Int16Array: σε ποια πύλη ανήκει το κομμάτι (-1 = σε καμία)
 
   // Ενώνει τα κεφάλαια σε έναν χάρτη: το ένα κάτω από το άλλο, μετατοπισμένα
   // οριζόντια ώστε το v κάθε κεφαλαίου να πέφτει ακριβώς πάνω από το ^ του επόμενου.
   loadWorld(chapters) {
-    const col = (map, row, ch) => map[row].indexOf(ch);
+    const col = (map, row, chars) => [...map[row]].findIndex((c) => chars.includes(c));
     const offsets = [0];
     for (let i = 1; i < chapters.length; i++) {
       const prev = chapters[i - 1].map;
-      offsets.push(offsets[i - 1] + col(prev, prev.length - 1, 'v') - col(chapters[i].map, 0, '^'));
+      offsets.push(offsets[i - 1] + col(prev, prev.length - 1, 'vw') - col(chapters[i].map, 0, '^'));
     }
     const minOff = Math.min(...offsets);
     for (let i = 0; i < offsets.length; i++) offsets[i] -= minOff;
@@ -45,6 +49,8 @@ const Level = {
     this.region = new Int8Array(this.cols * this.rows).fill(-1);
     this.monsters = [];
     this.altars = [];
+    this.items = [];
+    this.gates = [];
 
     let top = 0;
     chapters.forEach((ch, r) => {
@@ -60,17 +66,34 @@ const Level = {
           if (c === 'C') this.altars[r] = { x: cx, y: cy, tx: wx, ty: wy };
           if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G', region: r });
           if (c === 'E') { this.exit.tx = wx; this.exit.ty = wy; this.exit.x = cx; this.exit.y = cy; }
+          if (c === 'w') this.gates.push({ tx: wx, ty: wy, x: cx, y: cy, open: true });
+          const kind = { o: 'obol', s: 'string', j: 'jar' }[c];
+          if (kind) this.items.push({ kind, x: cx, y: cy, region: r });
         }
       });
       top += ch.map.length;
     });
 
+    // Τα κομμάτια χτίζονται με τις πύλες ανοιχτές (ώστε να υπάρχουν οι πλευρές
+    // των γειτονικών τοίχων) — οι ίδιες οι πύλες παίρνουν δικά τους κομμάτια.
     this.buildSegments();
-    this.segFade = new Float32Array(this.segCount);
+    this.segBaseFade = new Float32Array(this.segCount);
     for (let i = 0; i < this.segCount; i++) {
       // Το κομμάτι ανήκει στο κεφάλαιο του διαδρόμου μπροστά του.
       const r = this.regionAt(Math.floor(this.testX[i] / TILE), Math.floor(this.testY[i] / TILE));
-      this.segFade[i] = r >= 0 ? chapters[r].fade : 1.5;
+      this.segBaseFade[i] = r >= 0 ? chapters[r].fade : 1.5;
+    }
+    this.segFade = this.segBaseFade.slice();
+    this.gates.forEach((g, i) => this.setGate(i, false));
+  },
+
+  // Ανοίγει / κλείνει μια πύλη: αλλάζει το πλέγμα και (απ)ενεργοποιεί τα κομμάτια της.
+  setGate(i, open) {
+    const g = this.gates[i];
+    g.open = open;
+    this.grid[g.ty * this.cols + g.tx] = open ? 0 : 1;
+    for (let k = 0; k < this.segCount; k++) {
+      if (this.segGate[k] === i) this.segFade[k] = open ? 0 : this.segBaseFade[k];
     }
   },
 
@@ -195,9 +218,12 @@ const Level = {
       { nx: 1, ny: 0, ox: TILE, oy: 0, ax: 0, ay: 1 },     // δεξιά
     ];
 
+    const gateAt = (tx, ty) => this.gates.findIndex((g) => g.tx === tx && g.ty === ty);
+    const owners = [];
     for (let ty = 0; ty < this.rows; ty++) {
       for (let tx = 0; tx < this.cols; tx++) {
-        if (!this.isWall(tx, ty)) continue;
+        const gate = gateAt(tx, ty);
+        if (!this.isWall(tx, ty) && gate < 0) continue;
         for (const s of sides) {
           const ntx = tx + s.nx, nty = ty + s.ny;
           if (ntx < 0 || nty < 0 || ntx >= this.cols || nty >= this.rows) continue;
@@ -208,6 +234,7 @@ const Level = {
             const x2 = x1 + s.ax * len, y2 = y1 + s.ay * len;
             segs.push(x1, y1, x2, y2,
               (x1 + x2) / 2 + s.nx * nudge, (y1 + y2) / 2 + s.ny * nudge);
+            owners.push(gate);
           }
         }
       }
@@ -218,6 +245,7 @@ const Level = {
     this.segX1 = new Float32Array(n); this.segY1 = new Float32Array(n);
     this.segX2 = new Float32Array(n); this.segY2 = new Float32Array(n);
     this.testX = new Float32Array(n); this.testY = new Float32Array(n);
+    this.segGate = Int16Array.from(owners);
     for (let i = 0; i < n; i++) {
       this.segX1[i] = segs[i * 6];     this.segY1[i] = segs[i * 6 + 1];
       this.segX2[i] = segs[i * 6 + 2]; this.segY2[i] = segs[i * 6 + 3];

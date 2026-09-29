@@ -88,3 +88,41 @@ const Hints = {
     }
   },
 };
+
+// Άμεσα μηνύματα (αντικείμενα, Χάροντας κ.λπ.): βγαίνουν αμέσως, σε δικό τους
+// σημείο της οθόνης, χωρίς να διακόπτουν την ουρά του Hints.
+const Notice = {
+  el: null,
+  until: 0,
+
+  init(el) {
+    this.el = el;
+  },
+
+  // Αν δοθεί then, δείχνει μετά (στη σειρά) και δεύτερο μήνυμα.
+  show(text, now, time = 5, then = null) {
+    this.el.textContent = text;
+    this.el.classList.add('visible');
+    this.until = now + time;
+    this.then = then;
+  },
+
+  clear() {
+    this.until = 0;
+    this.then = null;
+    this.el.classList.remove('visible');
+  },
+
+  update(now) {
+    if (this.until && now >= this.until) {
+      if (this.then) {
+        const next = this.then;
+        this.then = null;
+        this.show(next.text, now, next.time);
+        return;
+      }
+      this.until = 0;
+      this.el.classList.remove('visible');
+    }
+  },
+};

@@ -10,11 +10,12 @@
 // Χάρτης: # = τοίχος   . = διάδρομος   S = αφετηρία (μόνο στο I)
 //         ^ = είσοδος από το προηγούμενο κεφάλαιο (στο πάνω τείχος)
 //         v = έξοδος προς το επόμενο κεφάλαιο (στο κάτω τείχος)
+//         w = σαν το v, αλλά κλειστό: η βάρκα του Χάροντα (ανοίγει με τον οβολό)
 //         C = βωμός / checkpoint (στην αρχή κάθε κεφαλαίου)
 //         M = σκιά που περιφέρεται   G = σκιά-φρουρός   E = η τελική έξοδος (μόνο στο V)
+//         o = οβολός   s = χορδή της λύρας   j = αγγείο σπονδής
 //
 // objective(strings): το κείμενο του στόχου, με τον πραγματικό αριθμό χορδών.
-// lures:  πόσα δολώματα έχει τουλάχιστον ο παίκτης όταν ανάβει τον βωμό.
 // fade:   σε πόσα δευτ. σβήνουν οι τοίχοι (Λήθη: 0.5 αντί για 1.5).
 // hints:  οδηγίες μετά τον στόχο (ίδια μορφή με το js/hints.js).
 const CHAPTERS = [
@@ -23,7 +24,6 @@ const CHAPTERS = [
     name: 'The Gate of Taenarum',
     line: 'The living do not come down here. You did.',
     objective: () => 'Your lyre is broken. Its three strings lie somewhere below. Find the way down.',
-    lures: 0,
     fade: 1.5,
     hints: [
       { touch: 'Drag on the left side of the screen to move.',
@@ -54,7 +54,6 @@ const CHAPTERS = [
     name: 'The Shore of Acheron',
     line: 'The ferryman takes no one for free. Not even the dead.',
     objective: (s) => `Find an obol to pay the ferryman. A string lies somewhere along the shore. Strings: ${s}/3`,
-    lures: 0,
     fade: 1.5,
     hints: [],
     map: [
@@ -75,12 +74,12 @@ const CHAPTERS = [
       '#.#######.#.###.#',
       '#.......#.#.....#',
       '#.#####.#.#####.#',
-      '#.#...#.#.....#.#',
+      '#.#o..#.#.....#.#',
       '#.#.#.#.#####.#.#',
       '#...#.......#...#',
       '#.#########.###.#',
-      '#...............#',
-      '###########v#####',
+      '#s..............#',
+      '###########w#####',
     ],
   },
   {
@@ -88,15 +87,11 @@ const CHAPTERS = [
     name: 'The Waters of Lethe',
     line: 'What you see here, you soon forget. Do not forget why you came.',
     objective: (s) => `A string sank near the river. Strings: ${s}/3`,
-    lures: 2,
     fade: 0.5,
-    hints: [
-      { touch: 'Tap the button at the top right to throw a lure where you are heading.',
-        keys: 'Press E to throw a lure in the direction you are heading.', until: 'lure', time: 10 },
-    ],
+    hints: [],
     map: [
       '#^#################',
-      '#C....#.........#.#',
+      '#C..j.#.........#j#',
       '#.###.#.#######.#.#',
       '#.#...#.#.....#...#',
       '#.#.###.#.###.#####',
@@ -126,7 +121,7 @@ const CHAPTERS = [
       '#.#####.#########.#',
       '#.#.............#.#',
       '#.#.###########.#.#',
-      '#.......#....G....#',
+      '#......s#....G....#',
       '#################v#',
     ],
   },
@@ -135,16 +130,15 @@ const CHAPTERS = [
     name: 'The Palace of Hades',
     line: 'The king of the dead has never heard a song.',
     objective: (s) => `A string is hidden in the palace. Strings: ${s}/3`,
-    lures: 2,
     fade: 1.5,
     hints: [],
     map: [
       '#^#####################',
-      '#C#...........#...#...#',
+      '#C#..........j#...#...#',
       '#.#.###.#######.#.#.#.#',
       '#.#...#.........#...#.#',
       '#.###.#####.###.#####.#',
-      '#.#.#.#...#.........#.#',
+      '#.#j#.#...#.........#.#',
       '#.#.#.#.#.###.#.###.#.#',
       '#.#...#.#.....#.#.#...#',
       '#.#.###.#.#####.#.###.#',
@@ -166,7 +160,7 @@ const CHAPTERS = [
       '#.###.#.###.#####.###.#',
       '#...#...#.......#.....#',
       '###.#####.#####.###.###',
-      '#.#...#...#...#.#..M..#',
+      '#s#...#...#...#.#..M..#',
       '#.###.#.###.#.#.###.#.#',
       '#.....#.#.#.#.#.....#.#',
       '#.#####.#.#.#.#####.#.#',
@@ -183,7 +177,6 @@ const CHAPTERS = [
     objective: (s) => (s === 3
       ? 'Your lyre is whole. Play it when the shades come near.'
       : 'Your lyre is still broken. You climb without its song.'),
-    lures: 3,
     fade: 1.5,
     hints: [],
     map: [
@@ -192,7 +185,7 @@ const CHAPTERS = [
       '#.#####.#.#####.#.###.#.#',
       '#.......#...#...#.......#',
       '#######.#.#.#.#####.#.#.#',
-      '#.#.....#.#.#.#.....#...#',
+      '#j#.....#.#.#.#.....#...#',
       '#.#.#####.#.#.###.###.#.#',
       '#...#.....#.#...#...#.#.#',
       '#.###.#####.###.###.#.#.#',
@@ -204,7 +197,7 @@ const CHAPTERS = [
       '#.#######.#####.###.#.###',
       '#.#.....#.....#...#.#.#.#',
       '#.#.#.#######.#.#.#.#.#.#',
-      '#.#.#.......#.#...#.#...#',
+      '#.#.#.......#.#...#j#...#',
       '#.#########.#.#.#######.#',
       '#.#.......#.....#.......#',
       '#.#.###.#.#######.#.#.###',

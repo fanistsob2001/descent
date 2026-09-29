@@ -198,10 +198,25 @@ body {
   left: 12px;
   right: 12px;
   z-index: 3;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;   /* το κέντρο μένει στη μέση, όσα κουμπιά κι αν υπάρχουν */
   align-items: center;
-  justify-content: space-between;
   pointer-events: none;
+}
+
+.hud-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.hud-right {
+  display: flex;
+  gap: 10px;
+  justify-self: end;
 }
 
 .hud-btn {
@@ -231,14 +246,15 @@ body {
   fill: currentColor;
 }
 
-.hud-btn svg .wave {
+.hud-btn svg .line {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.5;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-#lure-count {
+.hud-btn .count {
   position: absolute;
   right: -4px;
   bottom: -4px;
@@ -253,20 +269,48 @@ body {
   border-radius: 10px;
 }
 
-#btn-lure.empty {
+.hud-btn.empty {
   opacity: 0.2;
 }
 
-#btn-lure.empty #lure-count {
+.hud-btn.empty .count {
   background: rgba(200, 220, 255, 0.4);
 }
 
 #level-label {
-  font-family: system-ui, sans-serif;
   font-size: 0.7rem;
   letter-spacing: 0.3em;
-  text-transform: uppercase;
   opacity: 0.3;
+}
+
+#strings-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  opacity: 0.45;
+}
+
+/* Άμεσα μηνύματα (αντικείμενα, Χάροντας): κάτω από τον παίκτη. */
+#notice {
+  position: fixed;
+  top: 60%;
+  left: 16px;
+  right: 16px;
+  z-index: 3;
+  margin: 0 auto;
+  max-width: 380px;
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: center;
+  color: #f3dcc0;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 1);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+#notice.visible {
+  opacity: 0.9;
 }
 
 /* ---- Οδηγίες & τίτλος επιπέδου ---- */

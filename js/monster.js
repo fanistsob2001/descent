@@ -36,11 +36,23 @@ class Monster {
     this.revealTime = -1e6;
     this.revealStrength = 0;
     this.revealSeed = 0;
+
+    // Η Μελωδία την παγώνει: δεν κινείται, δεν ακούει, δεν σκοτώνει.
+    this.frozenUntil = -1e6;
+  }
+
+  freeze(until) {
+    this.frozenUntil = Math.max(this.frozenUntil, until);
+  }
+
+  isFrozen() {
+    return Echoes.now < this.frozenUntil;
   }
 
   // Καλείται από το Echoes όταν ένα κύμα φτάσει το τέρας.
   onHear(wave, d, los) {
     const now = Echoes.now;
+    if (this.isFrozen()) return;
     if (los) {
       const s = Math.min(1, 0.3 + Echoes.strengthAt(wave, d) * 1.2);
       if (s > this.revealAlpha(now)) {
@@ -104,6 +116,7 @@ class Monster {
   update(dt, now) {
     if (this.path.length === 0) this.pickNextGoal(now);
 
+    if (now < this.frozenUntil) return;
     let step = MONSTER_SPEED[this.state] * dt;
     while (step > 0 && this.path.length > 0) {
       const [tx, ty] = this.path[0];
@@ -124,11 +137,16 @@ class Monster {
   }
 
   touches(p) {
+    if (this.isFrozen()) return false;
     return Math.hypot(p.x - this.x, p.y - this.y) < p.r + this.r;
   }
 
   // Κόκκινη λάμψη. Αν δοθεί forceAlpha, σχεδιάζεται στην πραγματική θέση (π.χ. Game Over).
   draw(ctx, now, forceAlpha) {
+    if (forceAlpha === undefined && now < this.frozenUntil) {
+      this.drawRemembering(ctx, now);
+      return;
+    }
     let a, x, y, seed;
     if (forceAlpha !== undefined) {
       a = forceAlpha; x = this.x; y = this.y; seed = now * 3;
@@ -159,5 +177,29 @@ class Monster {
     }
     ctx.closePath();
     ctx.fill();
+  }
+
+  // Παγωμένη από τη Μελωδία: φαίνεται ως χλωμή, ήρεμη ανθρώπινη μορφή
+  // ("θυμάται ότι κάποτε ζούσε"), που σβήνει καθώς τελειώνει το πάγωμα.
+  drawRemembering(ctx, now) {
+    const left = this.frozenUntil - now;
+    const a = Math.min(1, left / 1.2) * (0.55 + 0.1 * Math.sin(now * 3));
+    const x = this.x, y = this.y;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, this.r * 3);
+    glow.addColorStop(0, `rgba(255,205,140,${(a * 0.3).toFixed(3)})`);
+    glow.addColorStop(1, 'rgba(255,205,140,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,225,190,${a.toFixed(3)})`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(x, y - 6, 3.2, 0, Math.PI * 2);   // κεφάλι
+    ctx.moveTo(x, y - 2.5);
+    ctx.lineTo(x - 5, y + 9);                   // χιτώνας
+    ctx.lineTo(x + 5, y + 9);
+    ctx.closePath();
+    ctx.stroke();
   }
 }

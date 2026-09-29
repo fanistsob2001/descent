@@ -18,13 +18,23 @@
     <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
     </button>
-    <div id="level-label"></div>
-    <button id="btn-lure" class="hud-btn" type="button" aria-label="Throw lure">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>
-      <span id="lure-count">0</span>
-    </button>
+    <div class="hud-center">
+      <div id="level-label"></div>
+      <div id="strings-label"></div>
+    </div>
+    <div class="hud-right">
+      <button id="btn-melody" class="hud-btn hidden" type="button" aria-label="Play the lyre">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M7 4c-3 3-3 9 0 13h10c3-4 3-10 0-13M7 4c1 2 1 4 0 6M17 4c-1 2-1 4 0 6M6 10h12M9 10v7M12 10v7M15 10v7M8 20h8"/></svg>
+        <span id="melody-count" class="count">0</span>
+      </button>
+      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M9 3h6M10 3v3c-4 2-5 7-3 11l2 3h6l2-3c2-4 1-9-3-11V3M7 10h10"/></svg>
+        <span id="jar-count" class="count">0</span>
+      </button>
+    </div>
   </div>
   <div id="hint"></div>
+  <div id="notice"></div>
   <div id="level-intro"><p id="intro-number"></p><p id="intro-name"></p><p id="intro-line"></p></div>
 
   <!-- Αρχικό μενού -->
@@ -38,7 +48,7 @@
       Wear headphones
     </p>
     <p class="controls touch-only">Left side: move &middot; Right side: sound</p>
-    <p class="controls keys-only">WASD move &middot; Shift sneak &middot; Space sound &middot; E lure &middot; Esc pause</p>
+    <p class="controls keys-only">WASD move &middot; Shift sneak &middot; Space sound &middot; E jar &middot; Q lyre &middot; Esc pause</p>
   </div>
 
   <div id="settings" class="overlay hidden">
@@ -74,7 +84,10 @@
   <script src="js/input.js"></script>
   <script src="js/monster.js"></script>
   <script src="js/exit.js"></script>
-  <script src="js/lure.js"></script>
+  <script src="js/jar.js"></script>
+  <script src="js/items.js"></script>
+  <script src="js/charon.js"></script>
+  <script src="js/melody.js"></script>
   <script src="js/hints.js"></script>
   <script src="js/save.js"></script>
   <script src="js/altar.js"></script>

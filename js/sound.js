@@ -251,8 +251,8 @@ const Sound = {
     src.stop(t + 0.12);
   },
 
-  // Πέταγμα δολώματος: σύντομο "φσστ".
-  lureThrow() {
+  // Πέταγμα αγγείου: σύντομο "φσστ".
+  jarThrow() {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
     const src = this.noiseSource();
@@ -270,32 +270,197 @@ const Sound = {
     src.stop(t + 0.3);
   },
 
-  // Το δόλωμα "φωνάζει": ηλεκτρονικό μπιπ από τη θέση του (x, y).
-  lureBeep(x, y) {
+  // Ένας ήχος από τη θέση (x, y) του κόσμου: ένταση και panning ανάλογα με
+  // το πού είναι σε σχέση με τον παίκτη. Επιστρέφει τον κόμβο εξόδου.
+  spatial(x, y, baseVol, falloff) {
+    const dx = x - this.listenerX, dy = y - this.listenerY;
+    const g = this.ctx.createGain();
+    g.gain.value = baseVol * Math.max(0.15, 1 - Math.hypot(dx, dy) / falloff);
+    const pan = this.panner(dx / 300);
+    if (pan) { g.connect(pan); pan.connect(this.sfx); pan.connect(this.echoSend); }
+    else { g.connect(this.sfx); g.connect(this.echoSend); }
+    return g;
+  },
+
+  // Αγγείο σπονδής που σπάει: χτύπος + θόρυβος + κεραμικά "τσιν".
+  shatter(x, y) {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
-    const dx = x - this.listenerX, dy = y - this.listenerY;
-    const d = Math.hypot(dx, dy);
-    const vol = 0.3 * Math.max(0.12, 1 - d / 700);
+    const out = this.spatial(x, y, 1, 750);
 
+    const thud = ac.createOscillator();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(140, t);
+    thud.frequency.exponentialRampToValueAtTime(50, t + 0.15);
+    const tg = ac.createGain();
+    this.envelope(tg.gain, t, 0.5, 0.003, 0.18);
+    thud.connect(tg);
+    tg.connect(out);
+    thud.start(t);
+    thud.stop(t + 0.25);
+
+    const noise = this.noiseSource();
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 1800;
+    const ng = ac.createGain();
+    this.envelope(ng.gain, t, 0.45, 0.002, 0.35);
+    noise.connect(hp);
+    hp.connect(ng);
+    ng.connect(out);
+    noise.start(t, Math.random());
+    noise.stop(t + 0.45);
+
+    for (let i = 0; i < 7; i++) {
+      const tt = t + 0.01 + Math.random() * 0.28;
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 2200 + Math.random() * 3500;
+      const g = ac.createGain();
+      this.envelope(g.gain, tt, 0.06 + Math.random() * 0.06, 0.002, 0.06 + Math.random() * 0.1);
+      o.connect(g);
+      g.connect(out);
+      o.start(tt);
+      o.stop(tt + 0.25);
+    }
+  },
+
+  // Μεταλλικό "κλινκ" νομίσματος (δύο φάλτσοι υψηλοί τόνοι).
+  coin() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    for (const [dt, f] of [[0, 2637], [0.09, 3520]]) {
+      for (const mul of [1, 2.71]) {
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f * mul;
+        const g = ac.createGain();
+        this.envelope(g.gain, t + dt, mul > 1 ? 0.03 : 0.1, 0.002, 0.5);
+        o.connect(g);
+        g.connect(this.sfx);
+        g.connect(this.reverbSend);
+        o.start(t + dt);
+        o.stop(t + dt + 0.6);
+      }
+    }
+  },
+
+  // Μαζεύεις αγγείο: σύντομο κεραμικό "τοκ".
+  jarPickup() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
     const o = ac.createOscillator();
-    o.type = 'square';
-    o.frequency.setValueAtTime(940, t);
-    o.frequency.exponentialRampToValueAtTime(620, t + 0.22);
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(620, t);
+    o.frequency.exponentialRampToValueAtTime(480, t + 0.1);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.15, 0.003, 0.14);
+    o.connect(g);
+    g.connect(this.sfx);
+    o.start(t);
+    o.stop(t + 0.2);
+  },
+
+  // Νότα "λύρας" με τον αλγόριθμο Karplus-Strong: θόρυβος μέσα σε μια γραμμή
+  // καθυστέρησης που μαλακώνει κάθε φορά — ακούγεται σαν χορδή που τσιμπιέται.
+  pluckBuffers: {},
+  pluckBuffer(freq) {
+    const key = Math.round(freq);
+    if (this.pluckBuffers[key]) return this.pluckBuffers[key];
+    const ac = this.ctx, sr = ac.sampleRate;
+    const len = Math.floor(sr * 2.2);
+    const buf = ac.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    const period = Math.max(2, Math.round(sr / freq));
+    const line = new Float32Array(period);
+    for (let i = 0; i < period; i++) line[i] = Math.random() * 2 - 1;
+    let p = 0;
+    for (let i = 0; i < len; i++) {
+      const next = (p + 1) % period;
+      const v = line[p];
+      line[p] = 0.996 * 0.5 * (v + line[next]);
+      d[i] = v;
+      p = next;
+    }
+    this.pluckBuffers[key] = buf;
+    return buf;
+  },
+
+  pluck(freq, when, vol) {
+    const ac = this.ctx;
+    const src = ac.createBufferSource();
+    src.buffer = this.pluckBuffer(freq);
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3500;
+    const g = ac.createGain();
+    g.gain.value = vol;
+    src.connect(lp);
+    lp.connect(g);
+    g.connect(this.sfx);
+    g.connect(this.reverbSend);
+    src.start(when);
+  },
+
+  // Βρήκες χορδή: μία νότα λύρας (n = ποια χορδή, 1..3 — κάθε φορά πιο ψηλά).
+  stringFound(n) {
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime;
+    const notes = [293.66, 349.23, 440];
+    this.pluck(notes[Math.max(0, Math.min(2, n - 1))], t, 0.5);
+    if (n >= 3) {
+      // Η λύρα ξανά ολόκληρη: και οι τρεις χορδές μαζί.
+      notes.forEach((f, i) => this.pluck(f, t + 0.35 + i * 0.12, 0.35));
+    }
+  },
+
+  // Η Μελωδία: ένα αργό arpeggio λύρας (Ρε δώριος) με πολύ reverb.
+  melody() {
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime;
+    const seq = [293.66, 349.23, 440, 523.25, 440, 392, 349.23, 293.66];
+    seq.forEach((f, i) => this.pluck(f, t + i * 0.16, 0.45));
+    this.pluck(146.83, t, 0.3);
+  },
+
+  // Ο Χάροντας δεν παίρνει τίποτα: χαμηλό, κούφιο μουρμουρητό.
+  charonRefuse() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const noise = this.noiseSource();
     const bp = ac.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = 1100;
-    bp.Q.value = 2;
+    bp.frequency.value = 220;
+    bp.Q.value = 3;
     const g = ac.createGain();
-    this.envelope(g.gain, t, vol, 0.005, 0.3);
-    o.connect(bp);
+    this.envelope(g.gain, t, 0.25, 0.2, 0.9);
+    noise.connect(bp);
     bp.connect(g);
-    const pan = this.panner(dx / 300);
-    const last = pan ? (g.connect(pan), pan) : g;
-    last.connect(this.sfx);
-    last.connect(this.echoSend);
-    o.start(t);
-    o.stop(t + 0.4);
+    g.connect(this.sfx);
+    g.connect(this.reverbSend);
+    noise.start(t, Math.random());
+    noise.stop(t + 1.3);
+  },
+
+  // Πληρώνεις τον Χάροντα: νόμισμα στην παλάμη και μετά νερό που κινείται.
+  charonPaid() {
+    if (!this.ready()) return;
+    this.coin();
+    const ac = this.ctx, t = ac.currentTime + 0.4;
+    const noise = this.noiseSource();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(300, t);
+    lp.frequency.linearRampToValueAtTime(900, t + 1.2);
+    lp.frequency.linearRampToValueAtTime(250, t + 2.6);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.3, 0.6, 2);
+    noise.connect(lp);
+    lp.connect(g);
+    g.connect(this.sfx);
+    g.connect(this.reverbSend);
+    noise.start(t, Math.random());
+    noise.stop(t + 2.8);
   },
 
   // Καρδιοχτύπι: δύο χαμηλά "γδουπ" (lub-dub). vol 0..1.
@@ -457,7 +622,7 @@ const Sound = {
   },
 
   // Κάθε frame: ένταση/panning/φίλτρο του γρυλίσματος κάθε τέρατος.
-  // voices = [{ x, y, los }] (άδειο = σιωπή)
+  // voices = [{ x, y, los } ή null για σιωπηλή σκιά] (άδειο = σιωπή)
   updateGrowls(voices) {
     if (!this.ctx) return;
     while (this.growls.length < voices.length) this.growls.push(this.makeGrowl());
