@@ -273,6 +273,26 @@ const Level = {
     }
   },
 
+  // Απόσταση από το (x, y) προς τη γωνία ang ως τον πρώτο τοίχο (το πολύ maxDist).
+  // Την ίδια διάσχιση πλέγματος χρησιμοποιεί και το lineOfSight.
+  castRay(x, y, ang, maxDist) {
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    let tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+    const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    const tDeltaX = adx > 1e-9 ? TILE / adx : Infinity;
+    const tDeltaY = ady > 1e-9 ? TILE / ady : Infinity;
+    let tMaxX = adx > 1e-9 ? (stepX > 0 ? (tx + 1) * TILE - x : x - tx * TILE) / adx : Infinity;
+    let tMaxY = ady > 1e-9 ? (stepY > 0 ? (ty + 1) * TILE - y : y - ty * TILE) / ady : Infinity;
+    let t = 0;
+    while (t < maxDist) {
+      if (tMaxX < tMaxY) { t = tMaxX; tMaxX += tDeltaX; tx += stepX; }
+      else { t = tMaxY; tMaxY += tDeltaY; ty += stepY; }
+      if (this.isWall(tx, ty)) return Math.min(t, maxDist);
+    }
+    return maxDist;
+  },
+
   // Οπτική επαφή ανάμεσα σε δύο σημεία (διάσχιση πλέγματος, Amanatides–Woo).
   lineOfSight(x0, y0, x1, y1) {
     let tx = Math.floor(x0 / TILE), ty = Math.floor(y0 / TILE);

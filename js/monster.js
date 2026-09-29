@@ -170,7 +170,7 @@ class Monster {
     ctx.save();
     ctx.translate(x, y + this.r * 1.2);
     ctx.scale(dir, 1);
-    Pottery.shade(ctx, 0, 0, this.r * 2.8, a, seed);
+    Pottery.shade(ctx, 0, 0, this.r * 3.4, a, seed, now);
     ctx.restore();
   }
 

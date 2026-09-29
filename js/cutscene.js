@@ -68,7 +68,7 @@ const Cutscene = {
       Pottery.seated(c, 250, ground, s, 1, -1, POT.cream, false);
     } else if (art === 'good') {
       // Βγαίνουν στο φως: εκείνος μπροστά, εκείνη πίσω του. Ο ήλιος δεξιά.
-      const sun = c.createRadialGradient(w - 40, 34, 4, w - 40, 34, 60);
+      const sun = c.createRadialGradient(w - 62, 56, 4, w - 62, 56, 52);
       sun.addColorStop(0, Pottery.rgba(POT.cream, 0.9));
       sun.addColorStop(1, Pottery.rgba(POT.light, 0));
       c.fillStyle = sun;

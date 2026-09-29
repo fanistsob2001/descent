@@ -201,37 +201,96 @@ const Sound = {
 
   // ---- Ηχητικά εφέ ----
 
-  // Το κύμα του παίκτη. size 0..1: μεγαλύτερο = βαθύτερο και πιο δυνατό.
-  ping(size) {
+  // Η φωνή του Ορφέα: ένα τραγουδιστό "Αα" που σβήνει μέσα στη σπηλιά, σαν να φωνάζει
+  // στο σκοτάδι. Μικρό κύμα = απαλό, ψηλό μουρμουρητό ("Μμ"). Μεγάλο κύμα = βαθύ,
+  // δυνατό, ανοιχτό "Αα". Φτιαγμένη με φωνηεντικά φίλτρα (formants) πάνω σε πριονωτούς
+  // τόνους, με δονισμό (vibrato) και λίγη ανάσα. lyre = η λύρα είναι ολόκληρη: ακούγεται
+  // και μια χορδή της μαζί με τη φωνή.
+  voice(size, lyre) {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
-    const freq = 1500 * Math.pow(330 / 1500, size);
-    const peak = 0.12 + 0.3 * size;
-    const dur = 0.35 + 1.1 * size;
+    const f0 = 262 * Math.pow(131 / 262, size);          // 262 Hz (μικρό) → 131 Hz (μεγάλο)
+    const dur = 0.5 + 1.2 * size;
+    const peak = 0.11 + 0.3 * size;
 
     const out = ac.createGain();
     out.connect(this.sfx);
     const send = ac.createGain();
-    send.gain.value = 0.55;
+    send.gain.value = 0.7 + 0.25 * size;
     out.connect(send);
     send.connect(this.echoSend);
     send.connect(this.reverbSend);
+    this.envelope(out.gain, t, peak, 0.06, dur);
 
-    // Κύριος τόνος + ένας "μεταλλικός" αρμονικός, σαν καμπανάκι σόναρ.
-    const partials = [[1, 1], [2.76, 0.3], [0.25, size * 0.8]];
-    for (const [mul, amp] of partials) {
-      if (amp < 0.01) continue;
+    // Πηγή: δύο πριονωτοί τόνοι ελαφρά ξεκούρδιστοι + ένας τριγωνικός μια οκτάβα πάνω.
+    const mix = ac.createGain();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 4200;
+    mix.connect(lp);
+
+    const vib = ac.createOscillator();      // δονισμός: μπαίνει σιγά σιγά, όπως στους τραγουδιστές
+    vib.frequency.value = 5.3;
+    const vibGain = ac.createGain();
+    vibGain.gain.setValueAtTime(0, t);
+    vibGain.gain.linearRampToValueAtTime(f0 * 0.014, t + 0.3);
+    vib.connect(vibGain);
+    vib.start(t);
+    vib.stop(t + dur + 0.4);
+
+    for (const [type, mul, detune, amp] of [['sawtooth', 1, -7, 0.5], ['sawtooth', 1, 7, 0.5], ['triangle', 2, 0, 0.25]]) {
       const o = ac.createOscillator();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(freq * mul * 1.04, t);
-      o.frequency.exponentialRampToValueAtTime(freq * mul, t + 0.08);
+      o.type = type;
+      o.detune.value = detune;
+      o.frequency.setValueAtTime(f0 * mul * 1.05, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * mul, t + 0.09);
+      o.frequency.linearRampToValueAtTime(f0 * mul * 0.955, t + dur);   // η φωνή πέφτει στο τέλος
+      vibGain.connect(o.frequency);
       const g = ac.createGain();
-      this.envelope(g.gain, t, peak * amp, 0.005, dur * (mul > 1 ? 0.5 : 1));
+      g.gain.value = amp;
       o.connect(g);
-      g.connect(out);
+      g.connect(mix);
       o.start(t);
-      o.stop(t + dur + 0.1);
+      o.stop(t + dur + 0.4);
     }
+
+    // Φωνηεντικά φίλτρα: το στόμα ανοίγει από "Μμ" προς "Αα" στην αρχή της νότας.
+    const open = 0.25 + 0.75 * size;                     // πόσο ανοιχτό καταλήγει το στόμα
+    const formants = [
+      [270, 730, 10, 1.0],                             // F1: κλειστό → ανοιχτό
+      [800, 1090, 12, 0.45],                           // F2
+      [2500, 2440, 14, 0.2],                           // F3
+    ];
+    for (const [fClosed, fOpen, q, gain] of formants) {
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = q;
+      const target = fClosed + (fOpen - fClosed) * open;
+      bp.frequency.setValueAtTime(fClosed, t);
+      bp.frequency.linearRampToValueAtTime(target, t + 0.22);
+      const g = ac.createGain();
+      g.gain.value = gain * 4.6;
+      lp.connect(bp);
+      bp.connect(g);
+      g.connect(out);
+    }
+
+    // Λίγη ανάσα στην αρχή της νότας.
+    const n = this.noiseSource();
+    const nbp = ac.createBiquadFilter();
+    nbp.type = 'bandpass';
+    nbp.frequency.value = 2600;
+    nbp.Q.value = 0.8;
+    const ng = ac.createGain();
+    this.envelope(ng.gain, t, 0.05 + 0.05 * size, 0.03, 0.22);
+    n.connect(nbp);
+    nbp.connect(ng);
+    ng.connect(out);
+    n.start(t, Math.random());
+    n.stop(t + 0.3);
+
+    // Η χορδή της λύρας μαζί με τη φωνή (Ρε δώριος, ίδια με τη Μελωδία).
+    if (lyre) this.pluck(size > 0.5 ? 146.83 : 293.66, t + 0.03, 0.26);
   },
 
   // Βήμα: πολύ σύντομος φιλτραρισμένος θόρυβος.
@@ -609,52 +668,107 @@ const Sound = {
     });
   },
 
-  // Jump scare: στρίγκλισμα + θόρυβος + χαμηλό "μπουμ". Δυνατό.
+  // Jump scare: ένα χορωδιακό ουρλιαχτό νεκρών (έξι φωνές με δυσαρμονικά διαστήματα που
+  // ανεβαίνουν απότομα), ένα χτύπημα πέτρας και το τρίξιμο του πηλού που σπάει.
   scare() {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
 
+    // 1) Το χτύπημα: πέτρα που πέφτει + βαθύς "μπουμ".
+    const boom = ac.createOscillator();
+    boom.type = 'sine';
+    boom.frequency.setValueAtTime(95, t);
+    boom.frequency.exponentialRampToValueAtTime(26, t + 0.9);
+    const bg = ac.createGain();
+    this.envelope(bg.gain, t, 1.0, 0.004, 0.95);
+    boom.connect(bg);
+    bg.connect(this.sfx);
+    boom.start(t);
+    boom.stop(t + 1.1);
+
+    const rock = this.noiseSource();
+    const rlp = ac.createBiquadFilter();
+    rlp.type = 'lowpass';
+    rlp.frequency.setValueAtTime(1800, t);
+    rlp.frequency.exponentialRampToValueAtTime(220, t + 0.45);
+    const rg = ac.createGain();
+    this.envelope(rg.gain, t, 0.75, 0.002, 0.5);
+    rock.connect(rlp);
+    rlp.connect(rg);
+    rg.connect(this.sfx);
+    rg.connect(this.reverbSend);
+    rock.start(t, Math.random());
+    rock.stop(t + 0.6);
+
+    // 2) Το ουρλιαχτό: φωνές με βάση που πηδάει προς τα πάνω και μετά σπάει.
     const shaper = ac.createWaveShaper();
     const curve = new Float32Array(1024);
     for (let i = 0; i < curve.length; i++) {
       const x = (i / (curve.length - 1)) * 2 - 1;
-      curve[i] = Math.tanh(x * 6);
+      curve[i] = Math.tanh(x * 3.2);
     }
     shaper.curve = curve;
-    const scream = ac.createGain();
-    this.envelope(scream.gain, t, 0.5, 0.01, 1.1);
-    shaper.connect(scream);
-    scream.connect(this.sfx);
-    scream.connect(this.reverbSend);
-    for (const mul of [1, 1.07, 1.52]) {
+    const wail = ac.createGain();
+    this.envelope(wail.gain, t + 0.005, 0.55, 0.012, 1.15);
+    shaper.connect(wail);
+    wail.connect(this.sfx);
+    wail.connect(this.reverbSend);
+    // Δυσαρμονία: μικρή δεύτερη, τρίτονο, ελαφρώς ξεκούρδιστες οκτάβες.
+    const ratios = [1, 1.0595, 1.4142, 1.498, 2.02, 2.16];
+    ratios.forEach((r, i) => {
       const o = ac.createOscillator();
       o.type = 'sawtooth';
-      o.frequency.setValueAtTime(900 * mul, t);
-      o.frequency.exponentialRampToValueAtTime(160 * mul, t + 1);
-      o.connect(shaper);
+      const f = 330 * r;
+      o.frequency.setValueAtTime(f * 0.7, t);
+      o.frequency.exponentialRampToValueAtTime(f * 1.55, t + 0.16);            // πηδάει προς τα πάνω
+      o.frequency.exponentialRampToValueAtTime(f * (1.15 + (i % 3) * 0.08), t + 0.75);
+      o.frequency.exponentialRampToValueAtTime(f * 0.75, t + 1.2);             // και σπάει προς τα κάτω
+      const vib = ac.createOscillator();
+      vib.frequency.value = 6 + i * 0.9;
+      const vg = ac.createGain();
+      vg.gain.value = f * 0.03;
+      vib.connect(vg);
+      vg.connect(o.frequency);
+      // Στόμα ανοιχτό "Αα" για κάθε φωνή.
+      const b1 = ac.createBiquadFilter();
+      b1.type = 'bandpass';
+      b1.frequency.value = 800 + i * 40;
+      b1.Q.value = 2.2;
+      const b2 = ac.createBiquadFilter();
+      b2.type = 'bandpass';
+      b2.frequency.value = 1750 + i * 60;
+      b2.Q.value = 3;
+      const g = ac.createGain();
+      g.gain.value = 0.7;
+      o.connect(b1);
+      o.connect(b2);
+      b1.connect(g);
+      b2.connect(g);
+      g.connect(shaper);
       o.start(t);
-      o.stop(t + 1.2);
+      o.stop(t + 1.3);
+      vib.start(t);
+      vib.stop(t + 1.3);
+    });
+
+    // 3) Ο πηλός που τρίζει και σπάει: μικρά κοφτά "τακ" ψηλών συχνοτήτων.
+    for (let i = 0; i < 12; i++) {
+      const tt = t + 0.04 + Math.random() * 0.6;
+      const n = this.noiseSource();
+      const hp = ac.createBiquadFilter();
+      hp.type = 'bandpass';
+      hp.frequency.value = 2400 + Math.random() * 4200;
+      hp.Q.value = 4;
+      const g = ac.createGain();
+      this.envelope(g.gain, tt, 0.16 + Math.random() * 0.14, 0.001, 0.02 + Math.random() * 0.05);
+      n.connect(hp);
+      hp.connect(g);
+      g.connect(this.sfx);
+      n.start(tt, Math.random() * 1.5);
+      n.stop(tt + 0.09);
     }
-
-    const noise = this.noiseSource();
-    const ng = ac.createGain();
-    this.envelope(ng.gain, t, 0.45, 0.005, 0.6);
-    noise.connect(ng);
-    ng.connect(this.sfx);
-    noise.start(t);
-    noise.stop(t + 0.7);
-
-    const boom = ac.createOscillator();
-    boom.type = 'sine';
-    boom.frequency.setValueAtTime(80, t);
-    boom.frequency.exponentialRampToValueAtTime(28, t + 0.8);
-    const bg = ac.createGain();
-    this.envelope(bg.gain, t, 0.9, 0.005, 0.9);
-    boom.connect(bg);
-    bg.connect(this.sfx);
-    boom.start(t);
-    boom.stop(t + 1);
   },
+
 
   // Οθόνη Game Over: βαθιά, αργή "καμπάνα".
   gameOver() {

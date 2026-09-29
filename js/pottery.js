@@ -55,45 +55,149 @@ const Pottery = {
     ctx.stroke();
   },
 
-  // Ο Ορφέας με τη λύρα του, όρθιος, κοιτάζει δεξιά. (x, y) = τα πόδια, s = ύψος.
-  // withLyre: σπασμένη λύρα = false (δεν κρατάει τίποτα).
-  orpheus(ctx, x, y, s, alpha, withLyre, dir = 1) {
+  // Πηλός "ψημένος" στη φωτιά: φωτεινότερος από τη μία πλευρά, σκουρότερος από την άλλη.
+  clay(ctx, x0, y0, x1, y1, alpha, base) {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, this.rgba(POT.light, alpha));
+    g.addColorStop(0.5, this.rgba(base || POT.terra, alpha));
+    g.addColorStop(1, this.rgba('116,52,26', alpha));
+    return g;
+  },
+
+  // Ο Ορφέας με τη λύρα του, κοιτάζει δεξιά (dir = -1: αριστερά). (x, y) = τα πόδια, s = ύψος.
+  // withLyre: η λύρα στα χέρια του (φωτίζει όταν είναι ολόκληρη).
+  // anim (προαιρετικό) = { phase, speed, t }: περπάτημα — phase σε ακτίνια, speed 0..1, t σε δευτ.
+  orpheus(ctx, x, y, s, alpha, withLyre, dir = 1, anim) {
+    const ph = anim ? anim.phase : 0, sp = anim ? anim.speed : 0, tm = anim ? anim.t : 0;
+    const sw = Math.sin(ph) * sp;
+    const bob = Math.abs(Math.cos(ph)) * 0.03 * s * sp;
+    const hipY = -0.42 * s, shY = -0.78 * s;
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x, y - bob);
     ctx.scale(dir, 1);
-    const fill = this.rgba(POT.terra, alpha);
-    ctx.fillStyle = fill;
-    // Κεφάλι με γένια.
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Μανδύας (χλαμύδα) στην πλάτη: "πρόσθετο κόκκινο", κυματίζει με τον αέρα και το βήμα.
+    const flow = 0.04 * s * Math.sin(tm * 3 + ph) + 0.1 * s * sp;
+    ctx.fillStyle = this.rgba(POT.red, alpha * 0.92);
     ctx.beginPath();
-    ctx.arc(0.02 * s, -0.88 * s, 0.085 * s, 0, Math.PI * 2);
+    ctx.moveTo(-0.01 * s, shY);
+    ctx.quadraticCurveTo(-0.17 * s - flow, -0.62 * s, -0.26 * s - flow * 1.7, -0.3 * s + Math.sin(tm * 4 + ph) * 0.025 * s);
+    ctx.lineTo(-0.11 * s - flow * 0.6, -0.24 * s);
+    ctx.quadraticCurveTo(-0.03 * s, -0.5 * s, 0.05 * s, shY + 0.02 * s);
+    ctx.closePath();
     ctx.fill();
+    if (alpha > 0.3) this.incise(ctx, [-0.06 * s, -0.66 * s, -0.16 * s - flow, -0.32 * s], s);
+
+    // Πόδια: το πίσω πιο σκούρο. Σηκώνονται λίγο στο βήμα.
+    const leg = (swing, lift, shade) => {
+      ctx.strokeStyle = this.rgba(shade ? '150,76,40' : POT.terra, alpha);
+      ctx.lineWidth = 0.075 * s;
+      ctx.beginPath();
+      ctx.moveTo(0.01 * s, hipY);
+      ctx.lineTo(0.01 * s + swing * 0.17 * s, -0.02 * s - lift * 0.06 * s);
+      ctx.stroke();
+      // Σανδάλι.
+      ctx.strokeStyle = this.rgba(POT.black, alpha * 0.9);
+      ctx.lineWidth = 0.03 * s;
+      ctx.beginPath();
+      const fx = 0.01 * s + swing * 0.17 * s, fy = -0.02 * s - lift * 0.06 * s;
+      ctx.moveTo(fx - 0.03 * s, fy + 0.02 * s);
+      ctx.lineTo(fx + 0.07 * s, fy + 0.02 * s);
+      ctx.stroke();
+    };
+    leg(-sw, Math.max(0, -Math.cos(ph)) * sp, true);
+
+    // Πίσω χέρι, ταλαντεύεται αντίθετα από το πόδι.
+    ctx.strokeStyle = this.rgba('150,76,40', alpha);
+    ctx.lineWidth = 0.06 * s;
     ctx.beginPath();
-    ctx.moveTo(0.05 * s, -0.84 * s);
-    ctx.lineTo(0.11 * s, -0.8 * s);
-    ctx.lineTo(0.03 * s, -0.77 * s);
-    ctx.fill();
-    // Μακρύς χιτώνας.
+    ctx.moveTo(-0.01 * s, shY + 0.05 * s);
+    ctx.lineTo(-0.05 * s + sw * 0.1 * s, -0.56 * s);
+    ctx.stroke();
+
+    // Χιτώνας με πτυχές και ζώνη, το τελείωμα ταλαντεύεται.
+    const hem = Math.sin(ph * 2) * 0.014 * s * sp;
+    ctx.fillStyle = this.clay(ctx, -0.13 * s, 0, 0.15 * s, 0, alpha);
     ctx.beginPath();
-    ctx.moveTo(-0.09 * s, -0.78 * s);
-    ctx.lineTo(0.1 * s, -0.78 * s);
-    ctx.lineTo(0.17 * s, 0);
-    ctx.lineTo(-0.17 * s, 0);
+    ctx.moveTo(-0.09 * s, shY);
+    ctx.lineTo(0.11 * s, shY);
+    ctx.lineTo(0.085 * s, -0.5 * s);
+    ctx.lineTo(0.155 * s + hem, -0.29 * s);
+    ctx.lineTo(-0.135 * s - hem, -0.29 * s);
+    ctx.lineTo(-0.07 * s, -0.5 * s);
     ctx.closePath();
     ctx.fill();
     if (alpha > 0.3) {
-      this.incise(ctx, [-0.03 * s, -0.6 * s, -0.07 * s, -0.02 * s], s);
-      this.incise(ctx, [0.04 * s, -0.6 * s, 0.07 * s, -0.02 * s], s);
-      this.incise(ctx, [-0.08 * s, -0.5 * s, 0.09 * s, -0.5 * s], s);
+      ctx.strokeStyle = this.rgba(POT.black, 0.9);
+      ctx.lineWidth = Math.max(0.8, s * 0.028);
+      ctx.beginPath();
+      ctx.moveTo(-0.075 * s, -0.5 * s);
+      ctx.lineTo(0.088 * s, -0.5 * s);   // ζώνη
+      ctx.stroke();
+      this.incise(ctx, [-0.03 * s, -0.5 * s, -0.06 * s - hem, -0.31 * s], s);
+      this.incise(ctx, [0.03 * s, -0.5 * s, 0.05 * s + hem, -0.31 * s], s);
+      this.incise(ctx, [-0.12 * s - hem, -0.32 * s, 0.14 * s + hem, -0.32 * s], s);   // τελείωμα
+      this.incise(ctx, [-0.05 * s, -0.75 * s, -0.04 * s, -0.55 * s], s);
     }
-    // Χέρι μπροστά.
-    ctx.strokeStyle = fill;
-    ctx.lineWidth = Math.max(1, s * 0.05);
-    ctx.lineCap = 'round';
+
+    leg(sw, Math.max(0, Math.cos(ph)) * sp, false);
+
+    // Μπροστινό χέρι που κρατάει τη λύρα.
+    ctx.strokeStyle = this.rgba(POT.terra, alpha);
+    ctx.lineWidth = 0.065 * s;
     ctx.beginPath();
-    ctx.moveTo(0.06 * s, -0.72 * s);
-    ctx.lineTo(0.2 * s, -0.55 * s);
+    ctx.moveTo(0.07 * s, shY + 0.05 * s);
+    ctx.lineTo(0.13 * s, -0.62 * s);
+    ctx.lineTo(0.2 * s, -0.58 * s);
     ctx.stroke();
-    if (withLyre) this.lyre(ctx, 0.26 * s, -0.56 * s, s * 0.34, alpha);
+    if (withLyre) {
+      // Φωτεινή λάμψη: η λύρα είναι ξανά ολόκληρη.
+      const glow = ctx.createRadialGradient(0.27 * s, -0.6 * s, 0, 0.27 * s, -0.6 * s, 0.32 * s);
+      glow.addColorStop(0, this.rgba(POT.cream, alpha * (0.28 + 0.08 * Math.sin(tm * 2.4))));
+      glow.addColorStop(1, this.rgba(POT.cream, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0.27 * s, -0.6 * s, 0.32 * s, 0, Math.PI * 2);
+      ctx.fill();
+      this.lyre(ctx, 0.27 * s, -0.62 * s, s * 0.36, alpha);
+    }
+
+    // Κεφάλι: πρόσωπο από πηλό, μαύρα μαλλιά με μπούκλες, γένια, μάτι.
+    const hx = 0.035 * s, hy = -0.885 * s, hr = 0.078 * s;
+    ctx.fillStyle = this.clay(ctx, hx - hr, hy, hx + hr, hy, alpha);
+    ctx.beginPath();
+    ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();     // μύτη
+    ctx.moveTo(hx + hr * 0.85, hy - hr * 0.15);
+    ctx.lineTo(hx + hr * 1.3, hy + hr * 0.25);
+    ctx.lineTo(hx + hr * 0.8, hy + hr * 0.3);
+    ctx.fill();
+    ctx.fillStyle = this.rgba(POT.black, alpha);
+    ctx.beginPath();     // κάλυμμα μαλλιών
+    ctx.arc(hx, hy, hr * 1.06, Math.PI * 0.72, Math.PI * 1.88);
+    ctx.lineTo(hx + hr * 0.25, hy - hr * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    for (const [cx, cy] of [[-0.9, 0.35], [-0.75, 0.75], [-0.35, 1.0]]) {
+      ctx.beginPath();
+      ctx.arc(hx + hr * cx, hy + hr * cy, hr * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();     // γένια
+    ctx.moveTo(hx + hr * 0.45, hy + hr * 0.55);
+    ctx.lineTo(hx + hr * 1.05, hy + hr * 0.55);
+    ctx.lineTo(hx + hr * 0.7, hy + hr * 1.5);
+    ctx.closePath();
+    ctx.fill();
+    if (alpha > 0.3) {
+      ctx.fillStyle = this.rgba(POT.cream, alpha);
+      ctx.beginPath();
+      ctx.arc(hx + hr * 0.5, hy - hr * 0.1, Math.max(0.5, hr * 0.13), 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   },
 
@@ -118,40 +222,75 @@ const Pottery = {
     ctx.stroke();
   },
 
-  // Σκιά: σκυφτή, τα χέρια απλωμένα μπροστά, κουρελιασμένο ρούχο, κούφιο μάτι.
-  // Χρώμα "πρόσθετο κόκκινο" με περίγραμμα πηλού. seed = μικρές διαφορές κάθε φορά.
-  shade(ctx, x, y, s, alpha, seed = 0) {
+  // Σκιά: σκυφτή, με απλωμένα χέρια, ημιδιαφανές "ρούχο" που ξεφτίζει προς τα κάτω
+  // και κινείται σαν καπνός, και ένα κούφιο μάτι που λάμπει.
+  // seed = μικρές διαφορές κάθε φορά, t = χρόνος για την κίνηση των ξεφτιών.
+  shade(ctx, x, y, s, alpha, seed = 0, t = 0) {
     ctx.save();
     ctx.translate(x, y);
-    const j = (i) => Math.sin(seed + i * 2.3) * 0.03 * s;   // "τρέμουλο" περιγράμματος
+    ctx.lineJoin = 'round';
+    const j = (i) => Math.sin(seed + i * 2.3 + t * 1.6) * 0.022 * s;
+
+    // Η κόκκινη ομίχλη γύρω της.
+    const halo = ctx.createRadialGradient(0.05 * s, -0.5 * s, 0, 0.05 * s, -0.5 * s, 0.85 * s);
+    halo.addColorStop(0, this.rgba(POT.red, alpha * 0.28));
+    halo.addColorStop(1, this.rgba(POT.red, 0));
+    ctx.fillStyle = halo;
+    ctx.fillRect(-0.85 * s, -1.4 * s, 1.7 * s, 1.7 * s);
+
+    // Σώμα: διαφάνεια που αυξάνεται προς τα κάτω.
+    const g = ctx.createLinearGradient(0, -1.0 * s, 0, 0.08 * s);
+    g.addColorStop(0, this.rgba('190,52,36', alpha));
+    g.addColorStop(0.6, this.rgba('120,30,22', alpha * 0.95));
+    g.addColorStop(1, this.rgba('80,16,12', 0));
     ctx.beginPath();
-    ctx.moveTo(-0.2 * s, 0);
-    // Κουρελιασμένο κάτω μέρος (ζιγκ-ζαγκ).
-    for (let i = 0; i <= 6; i++) ctx.lineTo(-0.2 * s + i * 0.07 * s, (i % 2 ? -0.08 : 0) * s + j(i));
-    ctx.lineTo(0.18 * s, -0.5 * s + j(7));
-    // Απλωμένα χέρια με μακριά δάχτυλα.
-    ctx.lineTo(0.42 * s, -0.55 * s + j(8));
-    ctx.lineTo(0.5 * s, -0.5 * s);
-    ctx.lineTo(0.4 * s, -0.62 * s + j(9));
-    ctx.lineTo(0.14 * s, -0.66 * s);
-    // Σκυμμένο κεφάλι μπροστά.
-    ctx.lineTo(0.2 * s, -0.78 * s + j(10));
-    ctx.quadraticCurveTo(0.12 * s, -1.0 * s, -0.04 * s, -0.9 * s);
-    ctx.quadraticCurveTo(-0.16 * s, -0.8 * s, -0.12 * s, -0.66 * s);
-    ctx.lineTo(-0.24 * s, -0.4 * s + j(11));
+    ctx.moveTo(-0.22 * s, 0.02 * s);
+    for (let i = 0; i <= 6; i++) {
+      const wave = Math.sin(t * 2.4 + i * 1.3 + seed) * 0.05 * s;
+      ctx.lineTo(-0.22 * s + i * 0.072 * s + wave * 0.4, ((i % 2 ? -0.11 : 0.03) * s) + wave);
+    }
+    ctx.lineTo(0.19 * s, -0.5 * s + j(7));
+    ctx.lineTo(0.44 * s, -0.55 * s + j(8));      // βραχίονας που απλώνεται
+    ctx.lineTo(0.5 * s, -0.51 * s);
+    ctx.lineTo(0.42 * s, -0.63 * s + j(9));
+    ctx.lineTo(0.14 * s, -0.67 * s);
+    ctx.lineTo(0.2 * s, -0.79 * s + j(10));      // κεφάλι σκυμμένο
+    ctx.quadraticCurveTo(0.12 * s, -1.02 * s, -0.04 * s, -0.91 * s);
+    ctx.quadraticCurveTo(-0.17 * s, -0.8 * s, -0.12 * s, -0.66 * s);
+    ctx.lineTo(-0.25 * s, -0.4 * s + j(11));
     ctx.closePath();
-    ctx.fillStyle = this.rgba(POT.red, alpha);
+    ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = this.rgba(POT.light, alpha * 0.9);
-    ctx.lineWidth = Math.max(0.8, s * 0.035);
+    ctx.strokeStyle = this.rgba(POT.light, alpha * 0.85);
+    ctx.lineWidth = Math.max(0.8, s * 0.03);
     ctx.stroke();
-    // Κούφιο μάτι και ένα χαραγμένο πλευρό.
-    ctx.fillStyle = this.rgba(POT.cream, alpha);
+
+    // Μακριά δάχτυλα με νύχια στο απλωμένο χέρι.
+    ctx.strokeStyle = this.rgba(POT.light, alpha * 0.9);
+    ctx.lineWidth = Math.max(0.7, s * 0.022);
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(0.1 * s, -0.84 * s, Math.max(0.8, 0.035 * s), 0, Math.PI * 2);
+    for (const [dx, dy] of [[0.13, -0.05], [0.16, 0.02], [0.13, 0.09]]) {
+      const fx = 0.48 * s, fy = -0.55 * s + Math.sin(t * 3 + dy * 40 + seed) * 0.012 * s;
+      ctx.moveTo(fx, fy + dy * 0.2 * s);
+      ctx.quadraticCurveTo(fx + dx * 0.6 * s, fy + dy * 0.6 * s, fx + dx * s, fy + dy * s + 0.02 * s);
+    }
+    ctx.stroke();
+
+    // Χαραγμένα πλευρά.
+    this.incise(ctx, [-0.09 * s, -0.56 * s, 0.11 * s, -0.42 * s], s);
+    this.incise(ctx, [-0.11 * s, -0.42 * s, 0.09 * s, -0.27 * s], s);
+
+    // Το κούφιο μάτι: μια λάμψη που αναβοσβήνει.
+    const flick = 0.75 + 0.25 * Math.sin(t * 9 + seed * 3);
+    const eg = ctx.createRadialGradient(0.1 * s, -0.85 * s, 0, 0.1 * s, -0.85 * s, 0.11 * s);
+    eg.addColorStop(0, this.rgba(POT.cream, alpha * flick));
+    eg.addColorStop(0.35, this.rgba('255,80,50', alpha * flick * 0.8));
+    eg.addColorStop(1, this.rgba('255,60,40', 0));
+    ctx.fillStyle = eg;
+    ctx.beginPath();
+    ctx.arc(0.1 * s, -0.85 * s, 0.11 * s, 0, Math.PI * 2);
     ctx.fill();
-    this.incise(ctx, [-0.08 * s, -0.55 * s, 0.1 * s, -0.4 * s], s);
-    this.incise(ctx, [-0.1 * s, -0.4 * s, 0.08 * s, -0.25 * s], s);
     ctx.restore();
   },
 
@@ -161,7 +300,10 @@ const Pottery = {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir, 1);
-    ctx.fillStyle = this.rgba(color, alpha);
+    const g = ctx.createLinearGradient(-0.2 * s, 0, 0.15 * s, 0);
+    g.addColorStop(0, this.rgba(color, alpha));
+    g.addColorStop(1, this.rgba('190,168,140', alpha));
+    ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(0.02 * s, -0.87 * s, 0.08 * s, 0, Math.PI * 2);
     ctx.fill();
@@ -181,6 +323,88 @@ const Pottery = {
     }
     ctx.restore();
   },
+
+  // Τρίποδας με λεκάνη φωτιάς (βωμός). (x, y) = το έδαφος στη μέση, s = ύψος.
+  brazier(ctx, x, y, s, alpha) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = this.rgba(POT.terra, alpha);
+    ctx.lineWidth = Math.max(1, s * 0.07);
+    ctx.beginPath();     // τρία πόδια
+    ctx.moveTo(-0.34 * s, 0); ctx.lineTo(-0.16 * s, -0.5 * s);
+    ctx.moveTo(0.34 * s, 0); ctx.lineTo(0.16 * s, -0.5 * s);
+    ctx.moveTo(0, 0); ctx.lineTo(0, -0.5 * s);
+    ctx.stroke();
+    // Λεκάνη με ζώνη μαιάνδρου.
+    ctx.fillStyle = this.clay(ctx, -0.5 * s, 0, 0.5 * s, 0, alpha);
+    ctx.beginPath();
+    ctx.moveTo(-0.5 * s, -0.62 * s);
+    ctx.quadraticCurveTo(-0.44 * s, -0.4 * s, 0, -0.36 * s);
+    ctx.quadraticCurveTo(0.44 * s, -0.4 * s, 0.5 * s, -0.62 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = this.rgba(POT.black, alpha * 0.9);
+    ctx.lineWidth = Math.max(0.8, s * 0.03);
+    ctx.beginPath();
+    for (let i = -3; i <= 3; i++) {
+      ctx.moveTo(i * 0.11 * s - 0.03 * s, -0.5 * s);
+      ctx.lineTo(i * 0.11 * s - 0.03 * s, -0.56 * s);
+      ctx.lineTo(i * 0.11 * s + 0.03 * s, -0.56 * s);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = this.rgba(POT.light, alpha);
+    ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.beginPath();     // χείλος
+    ctx.moveTo(-0.54 * s, -0.63 * s);
+    ctx.lineTo(0.54 * s, -0.63 * s);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // "Ψήσιμο" του πηλού πάνω σε έναν δίσκο (cx, cy, R): φως από πάνω αριστερά, σκοτεινές
+  // άκρες, κόκκοι, ρωγμές. Για το γοργόνειο του jump scare.
+  fire(ctx, cx, cy, R, seed) {
+    const rnd = (i) => Math.abs(Math.sin(seed * 91.7 + i * 12.9898) * 43758.5453) % 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.clip();
+    const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.05, cx, cy, R * 1.05);
+    g.addColorStop(0, 'rgba(255,214,160,0.26)');
+    g.addColorStop(0.45, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    // Κόκκοι στην επιφάνεια.
+    for (let i = 0; i < 420; i++) {
+      const a = rnd(i) * Math.PI * 2, d = Math.sqrt(rnd(i + 900)) * R;
+      ctx.fillStyle = rnd(i + 1800) > 0.5 ? 'rgba(0,0,0,0.22)' : 'rgba(255,200,150,0.16)';
+      const sz = R * (0.003 + rnd(i + 2700) * 0.006);
+      ctx.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d, sz, sz);
+    }
+    // Ρωγμές από την άκρη προς το κέντρο.
+    ctx.strokeStyle = 'rgba(12,5,3,0.85)';
+    ctx.lineWidth = Math.max(1, R * 0.008);
+    ctx.lineJoin = 'round';
+    for (let c = 0; c < 6; c++) {
+      let ang = rnd(c + 50) * Math.PI * 2, d = R * 1.02;
+      let px = cx + Math.cos(ang) * d, py = cy + Math.sin(ang) * d;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      const steps = 5 + Math.floor(rnd(c + 70) * 5);
+      for (let k = 0; k < steps; k++) {
+        ang += (rnd(c * 20 + k + 100) - 0.5) * 0.9;
+        d -= R * (0.08 + rnd(c * 20 + k + 300) * 0.09);
+        px = cx + Math.cos(ang) * d;
+        py = cy + Math.sin(ang) * d;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
 
   // Καθιστή μορφή σε θρόνο (Άδης με σκήπτρο / Περσεφόνη). dir: προς τα πού κοιτάζει.
   seated(ctx, x, y, s, alpha, dir, color, scepter) {

@@ -58,7 +58,12 @@ let killer = null;       // η σκιά που έπιασε τον παίκτη
 let showMap = false;     // βοήθεια για δοκιμές: πλήκτρο M
 
 // fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το αγγείο.
-const player = { x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1 };
+const player = {
+  x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1,
+  dir: 1,          // προς ποια πλευρά κοιτάει η μορφή (1 = δεξιά)
+  walkPhase: 0,    // φάση του βηματισμού (ακτίνια)
+  walkSpeed: 0,    // 0..1, εξομαλυμένη ταχύτητα για την κίνηση των ποδιών
+};
 const camera = { x: 0, y: 0 };
 
 // ---- Μέγεθος οθόνης ----
@@ -79,6 +84,9 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 function updatePlayer(dt) {
   const mx = Input.moveX, my = Input.moveY;
   const amount = Math.hypot(mx, my);
+  // Η κίνηση των ποδιών ακολουθεί ομαλά το αν περπατάς (και πόσο γρήγορα).
+  const target = amount < 0.01 ? 0 : (Input.running ? 1 : 0.55);
+  player.walkSpeed += (target - player.walkSpeed) * Math.min(1, dt * 10);
   if (amount < 0.01) return;
 
   const speed = Input.running
@@ -87,12 +95,14 @@ function updatePlayer(dt) {
   const ux = mx / amount, uy = my / amount;
   player.fx = ux;
   player.fy = uy;
+  if (Math.abs(ux) > 0.15) player.dir = ux < 0 ? -1 : 1;
 
   const ox = player.x, oy = player.y;
   player.x += ux * speed * dt;
   Level.pushOutOfWalls(player);
   player.y += uy * speed * dt;
   Level.pushOutOfWalls(player);
+  player.walkPhase += Math.hypot(player.x - ox, player.y - oy) * 0.11;
 
   Hints.notify('move', dt);
   if (!Input.running) {
@@ -119,7 +129,7 @@ function emitCall(held) {
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
     'call');
-  Sound.ping(c);
+  Sound.voice(c, strings >= 3);
   Hints.notify('call');
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
 }
@@ -202,7 +212,12 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (state === 'menu' || state === 'cutscene') return;
+  if (state === 'menu') {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    Fx.drawMenu(ctx, cssW, cssH, performance.now() / 1000);
+    return;
+  }
+  if (state === 'cutscene') return;
 
   // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο.
   if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
@@ -234,6 +249,7 @@ function draw() {
   Charon.draw(ctx, gameTime);
   Jars.draw(ctx, gameTime);
   Melody.draw(ctx, gameTime);
+  Fx.drawMotes(ctx, gameTime);
 
   for (const m of monsters) {
     if (state === 'dead' && m === killer) {
@@ -272,14 +288,23 @@ function drawPlayer() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = `rgba(${POT.terra},0.08)`;
+  // Απαλή λάμψη γύρω του και σκιά κάτω από τα πόδια.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, player.r * 3.4);
+  halo.addColorStop(0, `rgba(${POT.terra},${(0.13 + 0.12 * c).toFixed(3)})`);
+  halo.addColorStop(1, `rgba(${POT.terra},0)`);
+  ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r * 2.4, 0, Math.PI * 2);
+  ctx.arc(player.x, player.y, player.r * 3.4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
 
-  // Ο Ορφέας ως μορφή αγγείου. Η λύρα φαίνεται στα χέρια του όταν ξαναγίνει ολόκληρη.
-  const dir = player.fx < -0.1 ? -1 : 1;
-  Pottery.orpheus(ctx, player.x, player.y + player.r * 1.35, player.r * 3.2, 0.85 + 0.15 * c, strings >= 3, dir);
+  // Ο Ορφέας ως μορφή αγγείου που περπατάει. Η λύρα φαίνεται στα χέρια του
+  // όταν ξαναγίνει ολόκληρη.
+  const h = player.r * 4.2;
+  Pottery.orpheus(ctx, player.x, player.y + h * 0.5, h, 0.88 + 0.12 * c, strings >= 3, player.dir,
+    { phase: player.walkPhase, speed: player.walkSpeed, t: gameTime });
 }
 
 function drawJoystick() {
@@ -353,6 +378,7 @@ function frame(t) {
     for (const m of monsters) m.update(dt, gameTime);
     Jars.update(dt, gameTime);
     Eggs.update(dt, gameTime);
+    Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
     Echoes.update(dt, gameTime);
     Hints.update(gameTime);
     Notice.update(gameTime);
@@ -540,7 +566,7 @@ function spawn(saved) {
 
   // Μια πρώτη ανάσα: ένα μέτριο κύμα για να δεις πού βρίσκεσαι.
   Echoes.emit(player.x, player.y, 220, 0.6, 'call');
-  Sound.ping(0.3);
+  Sound.voice(0.3, strings >= 3);
 }
 
 // Παίζει μια cutscene (με τη ζωγραφιά art από πάνω) και μετά καλεί το then.
