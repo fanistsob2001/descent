@@ -423,6 +423,59 @@ const Sound = {
     this.pluck(146.83, t, 0.3);
   },
 
+  // Τα βήματα της Ευρυδίκης: πιο απαλά και πιο "ελαφριά" από του παίκτη,
+  // από τη θέση της (πίσω σου) — χωρίς ηχώ, για να μένουν κοντινά και προσωπικά.
+  softStep(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const dx = x - this.listenerX;
+    const src = this.noiseSource();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 900 + Math.random() * 300;
+    bp.Q.value = 0.9;
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.05 + Math.random() * 0.015, 0.006, 0.09);
+    src.connect(bp);
+    bp.connect(g);
+    const pan = this.panner(dx / 120);
+    if (pan) { g.connect(pan); pan.connect(this.sfx); } else g.connect(this.sfx);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + 0.14);
+  },
+
+  // Ψίθυρος "Or-phe-us...": θόρυβος μέσα από φίλτρα φωνηέντων, με πολύ reverb.
+  whisper() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime + 0.1;
+    // [πότε, διάρκεια, κεντρική συχνότητα, ένταση] — "Or", "phe", "u", "s"
+    const syllables = [[0, 0.32, 650, 0.22], [0.36, 0.2, 2600, 0.16], [0.58, 0.3, 900, 0.2], [0.86, 0.45, 5200, 0.12]];
+    for (const [dt, dur, f, vol] of syllables) {
+      const src = this.noiseSource();
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = f > 2000 ? 1.5 : 5;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t + dt);
+      g.gain.exponentialRampToValueAtTime(vol, t + dt + dur * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dt + dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(this.sfx);
+      g.connect(this.reverbSend);
+      src.start(t + dt, Math.random());
+      src.stop(t + dt + dur + 0.05);
+    }
+  },
+
+  // Απαλή νότα λύρας για κάθε γραμμή μιας cutscene (ανεβαίνει σιγά σιγά).
+  cutLine(i) {
+    if (!this.ready()) return;
+    const notes = [146.83, 174.61, 220, 196, 261.63, 220, 293.66, 261.63, 220];
+    this.pluck(notes[i % notes.length], this.ctx.currentTime, 0.22);
+  },
+
   // Ο Χάροντας δεν παίρνει τίποτα: χαμηλό, κούφιο μουρμουρητό.
   charonRefuse() {
     if (!this.ready()) return;

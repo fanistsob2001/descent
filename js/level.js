@@ -19,6 +19,7 @@ const Level = {
   altars: [],          // { x, y, tx, ty } — ένας βωμός ανά κεφάλαιο, με τη σειρά
   items: [],           // { kind: 'obol' | 'string' | 'jar', x, y, region } — ο δείκτης είναι το id
   gates: [],           // { tx, ty, x, y, open } — η βάρκα του Χάροντα
+  souls: [],           // { n, x, y } — μηνύματα χαμένων ψυχών (1..6)
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -51,6 +52,7 @@ const Level = {
     this.altars = [];
     this.items = [];
     this.gates = [];
+    this.souls = [];
 
     let top = 0;
     chapters.forEach((ch, r) => {
@@ -69,6 +71,7 @@ const Level = {
           if (c === 'w') this.gates.push({ tx: wx, ty: wy, x: cx, y: cy, open: true });
           const kind = { o: 'obol', s: 'string', j: 'jar' }[c];
           if (kind) this.items.push({ kind, x: cx, y: cy, region: r });
+          if (c >= '1' && c <= '6') this.souls.push({ n: Number(c), x: cx, y: cy });
         }
       });
       top += ch.map.length;

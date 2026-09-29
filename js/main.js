@@ -27,14 +27,15 @@ const MELODY_HINTS = [
 ];
 
 // Ένταση του ambient βουητού ανά κατάσταση.
-const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, end: 0.5 };
+const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, cutscene: 0.35, end: 0.5 };
 
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
-  menu: $('menu'), settings: $('settings'), pause: $('pause'), end: $('end'),
+  menu: $('menu'), settings: $('settings'), pause: $('pause'),
+  endGood: $('end-good'), endBad: $('end-bad'),
 };
 const hudEl = $('hud');
 const jarBtn = $('btn-jar');
@@ -120,6 +121,24 @@ function emitCall(held) {
     'call');
   Sound.ping(c);
   Hints.notify('call');
+  if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
+}
+
+// Ο κανόνας "μην κοιτάξεις πίσω" ισχύει όσο η Ευρυδίκη ακολουθεί, μέσα στο κεφάλαιο V.
+function lookBackRuleActive() {
+  return Eurydice.following() && playerRegion() === CHAPTERS.length - 1;
+}
+
+function playerRegion() {
+  return Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+}
+
+// Κοίταξες πίσω: ψίθυρος, και τα βήματά της σταματούν για πάντα.
+function lookBack() {
+  Eurydice.lose();
+  Sound.whisper();
+  Notice.show(STORY.whisper, gameTime, 2.5, { text: STORY.footstepsStop, time: 6 });
+  Notice.el.classList.add('whisper');
 }
 
 function throwJar() {
@@ -144,7 +163,7 @@ function pickUp(it) {
   if (it.kind === 'jar') {
     Jars.left++;
     Sound.jarPickup();
-    Notice.show('A libation jar. The dead hunger for offerings. Throw it, and they will come.', gameTime, 6);
+    Notice.show(STORY.jar, gameTime, 6);
     if (!jarsFound) Hints.push(JAR_HINTS);
     jarsFound = true;
   } else if (it.kind === 'obol') {
@@ -154,9 +173,9 @@ function pickUp(it) {
     strings = Math.min(3, strings + 1);
     Sound.stringFound(strings);
     if (strings < 3) {
-      Notice.show(`You found a string (${strings}/3).`, gameTime, 4);
+      Notice.show(STORY.string(strings), gameTime, 4);
     } else {
-      Notice.show('Your lyre is whole again. When you play, the shades remember they were once alive.', gameTime, 7);
+      Notice.show(STORY.lyreWhole, gameTime, 7);
       Melody.uses = MELODY_USES;
       Hints.push(MELODY_HINTS);
     }
@@ -168,11 +187,11 @@ function pickUp(it) {
 function checkCharon() {
   const r = Charon.check(player, hasObol, gameTime);
   if (r === 'empty') {
-    Notice.show('Charon holds out his hand. Yours is empty.', gameTime, 5);
+    Notice.show(STORY.charonEmpty, gameTime, 5);
     Sound.charonRefuse();
   } else if (r === 'paid') {
     hasObol = false;
-    Notice.show('The obol clinks into his palm. The boat begins to move.', gameTime, 6);
+    Notice.show(STORY.charonPaid, gameTime, 6);
     Sound.charonPaid();
   }
 }
@@ -183,7 +202,7 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (state === 'menu') return;
+  if (state === 'menu' || state === 'cutscene') return;
 
   // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο.
   if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
@@ -210,6 +229,7 @@ function draw() {
   Altars.draw(ctx, gameTime, view);
   ExitDoor.draw(ctx, gameTime);
   Items.draw(ctx, gameTime, view);
+  Souls.draw(ctx, gameTime, view);
   Charon.draw(ctx, gameTime);
   Jars.draw(ctx, gameTime);
   Melody.draw(ctx, gameTime);
@@ -238,7 +258,9 @@ function drawPlayer() {
     const pulse = 0.5 + 0.5 * Math.sin(gameTime * (8 + c * 16));
     const rr = player.r + 4 + c * 16;
     ctx.lineWidth = 1.5 / scale;
-    ctx.strokeStyle = `rgba(170,200,255,${(0.15 + 0.35 * c * pulse).toFixed(3)})`;
+    const warn = c >= LOOK_BACK_CHARGE && lookBackRuleActive();
+    const color = warn ? '255,60,50' : '170,200,255';
+    ctx.strokeStyle = `rgba(${color},${((warn ? 0.45 : 0.15) + 0.35 * c * pulse).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(player.x, player.y, rr, 0, Math.PI * 2);
     ctx.stroke();
@@ -340,6 +362,10 @@ function frame(t) {
 
     const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
     if (region !== hudRegion) updateHud();
+    Eurydice.update(player);
+
+    // Τέλος του κεφαλαίου IV: μόλις περάσεις στο V, παίζει η μεσαία cutscene.
+    if (state === 'play' && region === CHAPTERS.length - 1 && Eurydice.state === 'none') playMiddle();
 
     // Η κάμερα ακολουθεί τον παίκτη απαλά.
     const follow = 1 - Math.pow(0.001, dt);
@@ -453,7 +479,7 @@ function setState(s) {
 function chapterMessages(i) {
   const ch = CHAPTERS[i];
   return [
-    { touch: 'The flame is lit. Your progress is saved.', time: 3.5 },
+    { touch: STORY.checkpoint, time: 3.5 },
     { title: ch, time: 5 },
     { touch: ch.objective(strings), time: 8 },
     // Η οδηγία κίνησης έχει ήδη φανεί στην αρχή (και για να φτάσει εδώ, ο παίκτης κινήθηκε).
@@ -480,7 +506,10 @@ function spawn(saved) {
   Jars.reset(saved.jars);
   Melody.reset(saved.melody);
   Notice.clear();
-  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list];
+  Souls.reset();
+  // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
+  Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
+  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;
@@ -507,9 +536,32 @@ function spawn(saved) {
   Sound.ping(0.3);
 }
 
+// Παίζει μια cutscene και μετά καλεί το then.
+function playCutscene(lines, style, then) {
+  setState('cutscene');
+  stopInput();
+  Hints.stop();
+  Notice.clear();
+  showScreen(null);
+  Cutscene.play(lines, style, then);
+}
+
 function newGame() {
   Save.clear();
-  spawn(Save.fresh());
+  goFullscreen();
+  playCutscene(STORY.intro, '', () => spawn(Save.fresh()));
+}
+
+// Τέλος του κεφαλαίου IV: ο Άδης δίνει την Ευρυδίκη. Μετά συνεχίζεις από εκεί
+// που ήσουν (στην είσοδο του V), και εκείνη σε ακολουθεί.
+function playMiddle() {
+  playCutscene(STORY.middle, '', () => {
+    Eurydice.reset('following', player);
+    Dread.reset();
+    setState('play');
+    showScreen(null);
+    updateHud();
+  });
 }
 
 function continueGame() {
@@ -542,14 +594,14 @@ function die() {
   vibrate([250, 60, 500]);
 }
 
-// Προσωρινό τέλος — τα δύο κανονικά τέλη έρχονται στο στάδιο 3.
+// Η έξοδος στο φως: καλό τέλος αν η Ευρυδίκη ακόμα σε ακολουθεί, αλλιώς κακό.
 function reachedExit() {
-  setState('end');
-  stopInput();
-  Hints.stop();
-  Notice.clear();
-  Sound.win();
-  showScreen('end');
+  const good = Eurydice.following();
+  if (good) Sound.win(); else Sound.gameOver();
+  playCutscene(good ? STORY.good : STORY.bad, good ? 'good' : 'bad', () => {
+    setState('end');
+    showScreen(good ? 'endGood' : 'endBad');
+  });
 }
 
 function pauseGame() {
@@ -577,7 +629,7 @@ function doAction(action) {
   Sound.unlock();   // πρέπει να γίνει μέσα στο πάτημα του κουμπιού (iPhone)
   blurButtons();
   if (action === 'new') newGame();
-  else if (action === 'continue') continueGame();
+  else if (action === 'continue' || action === 'retry') continueGame();
   else if (action === 'settings') showScreen('settings');
   else if (action === 'back') showScreen('menu');
   else if (action === 'resume') resumeGame();
@@ -607,6 +659,7 @@ function init() {
   Hints.init($('hint'));
   Notice.init($('notice'));
   Hints.onTitle = showChapterTitle;
+  Cutscene.init();
 
   Level.loadWorld(CHAPTERS);
   player.x = camera.x = Level.start.x;
@@ -624,6 +677,12 @@ function init() {
   melodyBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); playMelody(); });
 
   window.addEventListener('keydown', (e) => {
+    if (state === 'cutscene') {
+      // Space / Enter = επόμενη γραμμή, Esc = Skip.
+      if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat) Cutscene.advance(); }
+      else if (e.code === 'Escape') Cutscene.finish();
+      return;
+    }
     if (e.code === 'Enter') {
       // Enter = το κύριο κουμπί της οθόνης που φαίνεται.
       e.preventDefault();

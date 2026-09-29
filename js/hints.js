@@ -102,6 +102,7 @@ const Notice = {
   // Αν δοθεί then, δείχνει μετά (στη σειρά) και δεύτερο μήνυμα.
   show(text, now, time = 5, then = null) {
     this.el.textContent = text;
+    this.el.classList.remove('whisper');
     this.el.classList.add('visible');
     this.until = now + time;
     this.then = then;

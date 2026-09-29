@@ -68,16 +68,27 @@
     <button class="btn" type="button" data-action="menu">Main menu</button>
   </div>
 
-  <!-- Προσωρινό τέλος (τα κανονικά τέλη έρχονται στο στάδιο 3) -->
-  <div id="end" class="overlay end hidden">
-    <h2>Light.</h2>
+  <!-- Cutscenes: οι γραμμές μπαίνουν από το js/cutscene.js -->
+  <div id="cutscene" class="overlay cutscene hidden">
+    <button id="cut-skip" type="button">Skip</button>
+    <div id="cut-lines"></div>
+    <div class="cut-next" aria-hidden="true"></div>
+  </div>
+
+  <!-- Μετά τα τέλη (τα κείμενα των κουμπιών από το STORY.md, ενότητα 5) -->
+  <div id="end-good" class="overlay end hidden">
     <button class="btn primary" type="button" data-action="menu">Main menu</button>
+  </div>
+  <div id="end-bad" class="overlay end hidden">
+    <button class="btn primary" type="button" data-action="retry">Try again from the last checkpoint</button>
+    <button class="btn" type="button" data-action="menu">Main menu</button>
   </div>
 
   <div id="rotate" class="overlay">
     <p>Turn your phone upright</p>
   </div>
 
+  <script src="js/story.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/level.js"></script>
   <script src="js/echo.js"></script>
@@ -88,6 +99,9 @@
   <script src="js/items.js"></script>
   <script src="js/charon.js"></script>
   <script src="js/melody.js"></script>
+  <script src="js/souls.js"></script>
+  <script src="js/eurydice.js"></script>
+  <script src="js/cutscene.js"></script>
   <script src="js/hints.js"></script>
   <script src="js/save.js"></script>
   <script src="js/altar.js"></script>

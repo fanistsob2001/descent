@@ -1,0 +1,65 @@
+'use strict';
+
+// Η Ευρυδίκη στο κεφάλαιο V (STORY.md, ενότητα 5): ακολουθεί τον παίκτη, αόρατη
+// (δεν επιτρέπεται να την κοιτάξεις) — ακούγονται μόνο τα απαλά βήματά της πίσω σου.
+// Ένα μεγάλο κύμα σημαίνει "κοίταξες πίσω": τη χάνεις για πάντα.
+const EURY_BEHIND = 46;        // πόσο πίσω (πάνω στη διαδρομή του παίκτη) περπατάει
+const EURY_STEP = 30;          // απόσταση ανάμεσα στα βήματά της
+// Πάνω από αυτή τη φόρτιση (0..1) το κύμα είναι "μεγάλο" = κοιτάζεις πίσω.
+const LOOK_BACK_CHARGE = 0.5;
+
+const Eurydice = {
+  // 'none' (πριν τη μεσαία cutscene) | 'following' | 'lost'
+  state: 'none',
+  trail: [],      // σημεία από όπου πέρασε ο παίκτης, το πιο καινούργιο στο τέλος
+  x: 0,
+  y: 0,
+  stepDist: 0,
+
+  reset(state, p) {
+    this.state = state;
+    this.trail = [{ x: p.x, y: p.y }];
+    this.x = p.x;
+    this.y = p.y;
+    this.stepDist = 0;
+  },
+
+  following() {
+    return this.state === 'following';
+  },
+
+  lose() {
+    this.state = 'lost';
+  },
+
+  update(p) {
+    if (this.state !== 'following') return;
+    const prev = this.trail[this.trail.length - 1];
+    if (Math.hypot(p.x - prev.x, p.y - prev.y) >= 4) this.trail.push({ x: p.x, y: p.y });
+
+    // Βρες το σημείο της διαδρομής που απέχει EURY_BEHIND από τον παίκτη (κατά μήκος της).
+    const last = this.trail[this.trail.length - 1];
+    let dist = Math.hypot(p.x - last.x, p.y - last.y);
+    let target = this.trail[0];
+    for (let i = this.trail.length - 1; i > 0; i--) {
+      const a = this.trail[i], b = this.trail[i - 1];
+      const seg = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist + seg >= EURY_BEHIND) {
+        const t = (EURY_BEHIND - dist) / seg;
+        target = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        this.trail.splice(0, i - 1);   // ό,τι είναι πιο πίσω δεν χρειάζεται πια
+        break;
+      }
+      dist += seg;
+    }
+
+    const moved = Math.hypot(target.x - this.x, target.y - this.y);
+    this.x = target.x;
+    this.y = target.y;
+    this.stepDist += moved;
+    if (this.stepDist >= EURY_STEP) {
+      this.stepDist -= EURY_STEP;
+      Sound.softStep(this.x, this.y);
+    }
+  },
+};
