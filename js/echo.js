@@ -106,8 +106,8 @@ const Echoes = {
     ctx.lineCap = 'butt';
     // Δύο περάσματα: φαρδιά αχνή λάμψη και λεπτός φωτεινός πυρήνας.
     const passes = [
-      { width: 7 / scale, color: '120,170,255', mul: 0.18 },
-      { width: 1.8 / scale, color: '215,232,255', mul: 1 },
+      { width: 7 / scale, color: POT.terra, mul: 0.22 },
+      { width: 1.8 / scale, color: POT.light, mul: 1 },
     ];
     for (const p of passes) {
       ctx.lineWidth = p.width;
@@ -131,7 +131,7 @@ const Echoes = {
       const t = w.r / w.radius;
       const a = w.strength * (w.kind === 'step' ? 0.1 : 0.22) * (1 - t);
       if (a < 0.005) continue;
-      ctx.strokeStyle = `rgba(170,200,255,${a.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${POT.terra},${a.toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
       ctx.stroke();

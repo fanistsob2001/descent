@@ -53,7 +53,7 @@ const Items = {
       const twinkle = 0.75 + 0.25 * Math.sin(now * 6 + it.id);
 
       // Λάμψη γύρω του, στο χρώμα του αντικειμένου.
-      const color = { obol: '255,215,120', string: '255,240,200', jar: '230,150,100' }[it.kind];
+      const color = { obol: POT.light, string: POT.cream, jar: POT.terra }[it.kind];
       const g = ctx.createRadialGradient(it.x, it.y, 0, it.x, it.y, 16);
       g.addColorStop(0, `rgba(${color},${(a * 0.35 * twinkle).toFixed(3)})`);
       g.addColorStop(1, `rgba(${color},0)`);
@@ -80,16 +80,19 @@ const Items = {
         ctx.quadraticCurveTo(it.x, it.y + wob, it.x + 7, it.y - 4);
         ctx.stroke();
       } else {
-        // Αγγείο: σώμα, λαιμός και χείλος.
-        ctx.moveTo(it.x - 2, it.y - 6);
-        ctx.lineTo(it.x + 2, it.y - 6);
-        ctx.moveTo(it.x - 1.5, it.y - 6);
-        ctx.lineTo(it.x - 1.5, it.y - 3.5);
-        ctx.quadraticCurveTo(it.x - 6, it.y, it.x - 2, it.y + 5);
-        ctx.lineTo(it.x + 2, it.y + 5);
-        ctx.quadraticCurveTo(it.x + 6, it.y, it.x + 1.5, it.y - 3.5);
+        // Αγγείο (λήκυθος): γεμάτο σώμα από πηλό, λαιμός, χείλος και μια
+        // μαύρη ζώνη γύρω από την κοιλιά, όπως στα αληθινά.
+        ctx.moveTo(it.x - 2.5, it.y - 7);
+        ctx.lineTo(it.x + 2.5, it.y - 7);
         ctx.lineTo(it.x + 1.5, it.y - 6);
-        ctx.stroke();
+        ctx.lineTo(it.x + 1.5, it.y - 4);
+        ctx.quadraticCurveTo(it.x + 6.5, it.y - 1, it.x + 2.5, it.y + 6);
+        ctx.lineTo(it.x - 2.5, it.y + 6);
+        ctx.quadraticCurveTo(it.x - 6.5, it.y - 1, it.x - 1.5, it.y - 4);
+        ctx.lineTo(it.x - 1.5, it.y - 6);
+        ctx.closePath();
+        ctx.fill();
+        Pottery.incise(ctx, [it.x - 4.4, it.y, it.x + 4.4, it.y], 40);
       }
     }
   },

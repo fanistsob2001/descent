@@ -75,7 +75,7 @@ const Jars = {
         ctx.save();
         ctx.translate(it.x, it.y);
         ctx.rotate(it.spin);
-        ctx.strokeStyle = 'rgba(230,150,100,0.85)';
+        ctx.strokeStyle = `rgba(${POT.terra},0.85)`;
         ctx.lineWidth = 1.3;
         ctx.beginPath();
         ctx.ellipse(0, 1, 3.5, 4.5, 0, 0, Math.PI * 2);
@@ -91,7 +91,7 @@ const Jars = {
       const t = (now - it.brokenAt) / JAR_SHARDS_TIME;
       const a = Math.max(0, 1 - t);
       const spread = 1 - Math.pow(1 - Math.min(1, t * 2.5), 3);
-      ctx.strokeStyle = `rgba(230,150,100,${a.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${POT.terra},${a.toFixed(3)})`;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       for (const s of it.shards) {

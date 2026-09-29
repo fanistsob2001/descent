@@ -67,37 +67,56 @@ const Charon = {
     if (this.paid) a = Math.max(a * (1 - leave), (1 - leave) * 0.6);
     if (a < 0.01) return;
 
+    // Σε στυλ αγγείου: μορφή από πηλό με χαραγμένες μαύρες λεπτομέρειες.
     const x = this.x, y = this.y + leave * TILE * 0.8;
-    ctx.strokeStyle = `rgba(200,210,230,${a.toFixed(3)})`;
-    ctx.fillStyle = `rgba(200,210,230,${(a * 0.25).toFixed(3)})`;
-    ctx.lineWidth = 1.4;
+    const terra = Pottery.rgba(POT.terra, a), light = Pottery.rgba(POT.light, a);
 
-    // Βάρκα: μακρόστενη, με μυτερές άκρες.
+    // Βάρκα: μαύρο κύτος με περίγραμμα πηλού και ένα "μάτι" στην πλώρη,
+    // όπως στα πλοία που ζωγράφιζαν στα αγγεία.
     ctx.beginPath();
-    ctx.moveTo(x - 17, y + 2);
-    ctx.quadraticCurveTo(x, y + 12, x + 17, y + 2);
-    ctx.quadraticCurveTo(x, y + 6, x - 17, y + 2);
-    ctx.stroke();
-
-    // Ο Χάροντας: ψηλή σκυμμένη φιγούρα με κουκούλα, κρατάει κοντάρι.
-    ctx.beginPath();
-    ctx.moveTo(x - 5, y + 5);
-    ctx.lineTo(x - 3, y - 8);
-    ctx.quadraticCurveTo(x - 1, y - 14, x + 3, y - 12);
-    ctx.lineTo(x + 5, y + 5);
-    ctx.closePath();
+    ctx.moveTo(x - 18, y + 1);
+    ctx.quadraticCurveTo(x, y + 13, x + 16, y + 3);
+    ctx.lineTo(x + 20, y - 2);
+    ctx.lineTo(x + 14, y + 2);
+    ctx.quadraticCurveTo(x, y + 6, x - 18, y + 1);
+    ctx.fillStyle = Pottery.rgba(POT.black, a);
     ctx.fill();
+    ctx.strokeStyle = terra;
+    ctx.lineWidth = 1.3;
     ctx.stroke();
+    ctx.fillStyle = light;
     ctx.beginPath();
-    ctx.moveTo(x + 9, y - 15);
+    ctx.arc(x + 12, y + 4, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ο Χάροντας: ψηλή σκυμμένη μορφή με κουκούλα.
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y + 4);
+    ctx.lineTo(x - 4, y - 8);
+    ctx.quadraticCurveTo(x - 2, y - 15, x + 3, y - 13);
+    ctx.lineTo(x + 2, y - 9);
+    ctx.lineTo(x + 5, y + 4);
+    ctx.closePath();
+    ctx.fillStyle = terra;
+    ctx.fill();
+    Pottery.incise(ctx, [x - 3, y - 7, x - 2, y + 3], 20);
+    Pottery.incise(ctx, [x + 1, y - 6, x + 2, y + 3], 20);
+
+    // Κοντάρι.
+    ctx.strokeStyle = light;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x + 9, y - 16);
     ctx.lineTo(x + 6, y + 9);
     ctx.stroke();
 
     // Το απλωμένο χέρι, όσο περιμένει πληρωμή.
     if (!this.paid) {
+      ctx.strokeStyle = terra;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(x - 2, y - 5);
-      ctx.lineTo(x - 9, y - 7);
+      ctx.moveTo(x - 2, y - 6);
+      ctx.lineTo(x - 10, y - 8);
       ctx.stroke();
     }
   },

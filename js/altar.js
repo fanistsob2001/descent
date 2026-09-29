@@ -67,7 +67,7 @@ const Altars = {
 
       if (stone > 0.01) {
         // Η πέτρα του βωμού: ένα μικρό βάθρο με "κύπελλο" για τη φλόγα.
-        ctx.strokeStyle = `rgba(230,200,170,${stone.toFixed(3)})`;
+        ctx.strokeStyle = `rgba(${POT.terra},${stone.toFixed(3)})`;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(a.x - 9, a.y - 2, 18, 10);
         ctx.beginPath();

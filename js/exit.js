@@ -55,7 +55,7 @@ const ExitDoor = {
 
     ctx.fillStyle = `rgba(255,214,150,${(a * 0.35).toFixed(3)})`;
     ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-    ctx.strokeStyle = `rgba(255,222,170,${a.toFixed(3)})`;
+    ctx.strokeStyle = `rgba(${POT.light},${a.toFixed(3)})`;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
 

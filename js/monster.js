@@ -157,26 +157,21 @@ class Monster {
     }
 
     const glow = ctx.createRadialGradient(x, y, 0, x, y, this.r * 3);
-    glow.addColorStop(0, `rgba(255,40,30,${(a * 0.45).toFixed(3)})`);
-    glow.addColorStop(1, 'rgba(255,40,30,0)');
+    glow.addColorStop(0, `rgba(${POT.red},${(a * 0.5).toFixed(3)})`);
+    glow.addColorStop(1, `rgba(${POT.red},0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Ακανόνιστο σχήμα: κάθε φορά που φαίνεται, είναι λίγο διαφορετικό.
-    const points = 11;
-    ctx.fillStyle = `rgba(255,70,55,${a.toFixed(3)})`;
-    ctx.beginPath();
-    for (let i = 0; i < points; i++) {
-      const ang = (i / points) * Math.PI * 2;
-      const n = Math.sin(seed + i * 2.7) * 0.5 + Math.sin(seed * 1.3 + i * 5.1) * 0.5;
-      const rr = this.r * (0.8 + 0.35 * n);
-      const px = x + Math.cos(ang) * rr, py = y + Math.sin(ang) * rr;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
+    // Σιλουέτα σκιάς σε στυλ αγγείου (js/pottery.js), κάθε φορά λίγο διαφορετική.
+    // Κοιτάζει προς τον παίκτη, όπως ήταν τη στιγμή που φάνηκε.
+    const dir = (typeof player !== 'undefined' && player.x < x) ? -1 : 1;
+    ctx.save();
+    ctx.translate(x, y + this.r * 1.2);
+    ctx.scale(dir, 1);
+    Pottery.shade(ctx, 0, 0, this.r * 2.8, a, seed);
+    ctx.restore();
   }
 
   // Παγωμένη από τη Μελωδία: φαίνεται ως χλωμή, ήρεμη ανθρώπινη μορφή
@@ -186,20 +181,13 @@ class Monster {
     const a = Math.min(1, left / 1.2) * (0.55 + 0.1 * Math.sin(now * 3));
     const x = this.x, y = this.y;
     const glow = ctx.createRadialGradient(x, y, 0, x, y, this.r * 3);
-    glow.addColorStop(0, `rgba(255,205,140,${(a * 0.3).toFixed(3)})`);
-    glow.addColorStop(1, 'rgba(255,205,140,0)');
+    glow.addColorStop(0, `rgba(${POT.cream},${(a * 0.3).toFixed(3)})`);
+    glow.addColorStop(1, `rgba(${POT.cream},0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = `rgba(255,225,190,${a.toFixed(3)})`;
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.arc(x, y - 6, 3.2, 0, Math.PI * 2);   // κεφάλι
-    ctx.moveTo(x, y - 2.5);
-    ctx.lineTo(x - 5, y + 9);                   // χιτώνας
-    ctx.lineTo(x + 5, y + 9);
-    ctx.closePath();
-    ctx.stroke();
+    // Σε "πρόσθετο λευκό", όρθια και ήρεμη — όπως ήταν όσο ζούσε.
+    Pottery.woman(ctx, x, y + this.r * 1.1, this.r * 2.4, a);
   }
 }

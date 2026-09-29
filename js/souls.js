@@ -62,7 +62,7 @@ const Souls = {
       // Σκοτεινό "φόντο" ώστε να διαβάζεται πάνω από τους φωτισμένους τοίχους.
       ctx.fillStyle = `rgba(0,0,0,${(a * 0.7).toFixed(3)})`;
       ctx.fillRect(s.x - SOUL_WIDTH / 2 - 6, top - lh / 2 - 4, SOUL_WIDTH + 12, s.lines.length * lh + 8);
-      ctx.fillStyle = `rgba(214,226,255,${(a * 0.85).toFixed(3)})`;
+      ctx.fillStyle = `rgba(${POT.cream},${(a * 0.85).toFixed(3)})`;
       s.lines.forEach((l, i) => ctx.fillText(l, s.x, top + i * lh));
     }
   },

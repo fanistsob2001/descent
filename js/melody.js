@@ -42,7 +42,7 @@ const Melody = {
       for (let k = 0; k < 3; k++) {
         const rr = MELODY_RADIUS * Math.max(0, ease - k * 0.08);
         if (rr <= 0) continue;
-        ctx.strokeStyle = `rgba(255,205,120,${((1 - t) * (0.35 - k * 0.1)).toFixed(3)})`;
+        ctx.strokeStyle = `rgba(${POT.light},${((1 - t) * (0.35 - k * 0.1)).toFixed(3)})`;
         ctx.lineWidth = 2 - k * 0.5;
         ctx.beginPath();
         ctx.arc(r.x, r.y, rr, 0, Math.PI * 2);

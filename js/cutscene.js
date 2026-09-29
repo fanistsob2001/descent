@@ -28,7 +28,8 @@ const Cutscene = {
   },
 
   // style: '' | 'good' | 'bad' (λίγο διαφορετικό φόντο για τα τέλη)
-  play(lines, style, onEnd) {
+  // art: 'intro' | 'middle' | 'good' | 'bad' — η μικρή "ζωγραφιά αγγείου" από πάνω
+  play(lines, style, onEnd, art) {
     this.lines = lines;
     this.shown = 0;
     this.onEnd = onEnd;
@@ -36,7 +37,50 @@ const Cutscene = {
     this.lastAdvance = 0;
     this.linesEl.textContent = '';
     this.el.className = 'overlay cutscene ' + (style || '');
+    this.drawArt(art);
     this.showNext();
+  },
+
+  // Μια σκηνή σαν ζωφόρος αγγείου: μορφές σε σιλουέτα πάνω από έναν μαίανδρο.
+  drawArt(art) {
+    const cv = document.getElementById('cut-art');
+    const w = 300, h = 118, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = w * dpr;
+    cv.height = h * dpr;
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    const ground = h - 18, s = 84;
+    if (art === 'intro') {
+      // Ο Ορφέας με τη λύρα, και το φίδι στο χορτάρι.
+      Pottery.orpheus(c, w / 2 - 10, ground, s, 1, true);
+      c.strokeStyle = Pottery.rgba(POT.terra, 1);
+      c.lineWidth = 2.2;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(w / 2 + 40, ground - 3);
+      for (let i = 1; i <= 8; i++) c.lineTo(w / 2 + 40 + i * 6, ground - 3 - Math.sin(i * 1.3) * 4);
+      c.stroke();
+    } else if (art === 'middle') {
+      // Ο Ορφέας παίζει μπροστά στον Άδη και την Περσεφόνη.
+      Pottery.orpheus(c, 70, ground, s, 1, true);
+      Pottery.seated(c, 190, ground, s, 1, -1, POT.terra, true);
+      Pottery.seated(c, 250, ground, s, 1, -1, POT.cream, false);
+    } else if (art === 'good') {
+      // Βγαίνουν στο φως: εκείνος μπροστά, εκείνη πίσω του. Ο ήλιος δεξιά.
+      const sun = c.createRadialGradient(w - 40, 34, 4, w - 40, 34, 60);
+      sun.addColorStop(0, Pottery.rgba(POT.cream, 0.9));
+      sun.addColorStop(1, Pottery.rgba(POT.light, 0));
+      c.fillStyle = sun;
+      c.fillRect(0, 0, w, h);
+      Pottery.woman(c, 110, ground, s, 1, 1);
+      Pottery.orpheus(c, 170, ground, s, 1, true);
+    } else if (art === 'bad') {
+      // Γύρισε: την κοιτάζει, κι εκείνη σβήνει στο σκοτάδι.
+      Pottery.woman(c, 115, ground, s, 0.28, 1);
+      Pottery.orpheus(c, 180, ground, s, 1, true, -1);
+    }
+    Pottery.meander(c, 20, h - 14, w - 40, 12, POT.terra, 0.9, 1.3);
   },
 
   showNext() {

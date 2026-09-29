@@ -246,6 +246,9 @@ function draw() {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (state === 'play' || state === 'paused') Dread.drawVignette(ctx, cssW, cssH, gameTime);
+  // Λεπτός μαίανδρος πάνω και κάτω, σαν το στεφάνι ενός αγγείου.
+  Pottery.meander(ctx, 0, 1, cssW, 10, POT.terra, 0.28, 1);
+  Pottery.meander(ctx, 0, cssH - 11, cssW, 10, POT.terra, 0.28, 1);
   if (state === 'play') drawJoystick();
   if (state === 'dead') drawDeathFlash();
 }
@@ -259,36 +262,37 @@ function drawPlayer() {
     const rr = player.r + 4 + c * 16;
     ctx.lineWidth = 1.5 / scale;
     const warn = c >= LOOK_BACK_CHARGE && lookBackRuleActive();
-    const color = warn ? '255,60,50' : '170,200,255';
-    ctx.strokeStyle = `rgba(${color},${((warn ? 0.45 : 0.15) + 0.35 * c * pulse).toFixed(3)})`;
+    // Κανονικά στο χρώμα του πηλού· κόκκινο (έντονο) όταν στο V θα σήμαινε "κοιτάζω πίσω".
+    const color = warn ? '255,40,30' : POT.light;
+    if (warn) ctx.lineWidth = 2.6 / scale;
+    ctx.strokeStyle = `rgba(${color},${((warn ? 0.55 : 0.2) + 0.35 * c * pulse).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(player.x, player.y, rr, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  ctx.fillStyle = 'rgba(150,180,255,0.07)';
+  ctx.fillStyle = `rgba(${POT.terra},0.08)`;
   ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r * 2.2, 0, Math.PI * 2);
+  ctx.arc(player.x, player.y, player.r * 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = `rgba(230,240,255,${(0.75 + 0.25 * c).toFixed(3)})`;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r * 0.6, 0, Math.PI * 2);
-  ctx.fill();
+  // Ο Ορφέας ως μορφή αγγείου. Η λύρα φαίνεται στα χέρια του όταν ξαναγίνει ολόκληρη.
+  const dir = player.fx < -0.1 ? -1 : 1;
+  Pottery.orpheus(ctx, player.x, player.y + player.r * 1.35, player.r * 3.2, 0.85 + 0.15 * c, strings >= 3, dir);
 }
 
 function drawJoystick() {
   const j = Input.joy;
   if (j.id === null) return;
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.strokeStyle = `rgba(${POT.terra},0.3)`;
   ctx.beginPath();
   ctx.arc(j.ox, j.oy, JOY_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
 
   // Εσωτερικός κύκλος: μέσα του περπατάς αθόρυβα, έξω του τρέχεις.
   const runR = JOY_RADIUS * (JOY_DEADZONE + RUN_THRESHOLD * (1 - JOY_DEADZONE));
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.strokeStyle = `rgba(${POT.terra},0.15)`;
   ctx.beginPath();
   ctx.arc(j.ox, j.oy, runR, 0, Math.PI * 2);
   ctx.stroke();
@@ -296,7 +300,7 @@ function drawJoystick() {
   let dx = j.x - j.ox, dy = j.y - j.oy;
   const len = Math.hypot(dx, dy);
   if (len > JOY_RADIUS) { dx *= JOY_RADIUS / len; dy *= JOY_RADIUS / len; }
-  ctx.fillStyle = Input.running ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.12)';
+  ctx.fillStyle = Input.running ? `rgba(${POT.terra},0.45)` : `rgba(${POT.terra},0.2)`;
   ctx.beginPath();
   ctx.arc(j.ox + dx, j.oy + dy, 20, 0, Math.PI * 2);
   ctx.fill();
@@ -536,26 +540,26 @@ function spawn(saved) {
   Sound.ping(0.3);
 }
 
-// Παίζει μια cutscene και μετά καλεί το then.
-function playCutscene(lines, style, then) {
+// Παίζει μια cutscene (με τη ζωγραφιά art από πάνω) και μετά καλεί το then.
+function playCutscene(lines, style, art, then) {
   setState('cutscene');
   stopInput();
   Hints.stop();
   Notice.clear();
   showScreen(null);
-  Cutscene.play(lines, style, then);
+  Cutscene.play(lines, style, then, art);
 }
 
 function newGame() {
   Save.clear();
   goFullscreen();
-  playCutscene(STORY.intro, '', () => spawn(Save.fresh()));
+  playCutscene(STORY.intro, '', 'intro', () => spawn(Save.fresh()));
 }
 
 // Τέλος του κεφαλαίου IV: ο Άδης δίνει την Ευρυδίκη. Μετά συνεχίζεις από εκεί
 // που ήσουν (στην είσοδο του V), και εκείνη σε ακολουθεί.
 function playMiddle() {
-  playCutscene(STORY.middle, '', () => {
+  playCutscene(STORY.middle, '', 'middle', () => {
     Eurydice.reset('following', player);
     Dread.reset();
     setState('play');
@@ -598,7 +602,8 @@ function die() {
 function reachedExit() {
   const good = Eurydice.following();
   if (good) Sound.win(); else Sound.gameOver();
-  playCutscene(good ? STORY.good : STORY.bad, good ? 'good' : 'bad', () => {
+  const kind = good ? 'good' : 'bad';
+  playCutscene(good ? STORY.good : STORY.bad, kind, kind, () => {
     setState('end');
     showScreen(good ? 'endGood' : 'endBad');
   });
