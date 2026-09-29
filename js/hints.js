@@ -1,8 +1,13 @@
 'use strict';
 
-// Οδηγίες στην οθόνη (tutorial). Δείχνει τα hints του επιπέδου ένα-ένα.
+// Μηνύματα στην οθόνη, το ένα μετά το άλλο (ουρά).
+//   touch / keys: κείμενο για κινητό / υπολογιστή (αν λείπει το keys, χρησιμοποιείται το touch)
+//   until: 'move' | 'call' | 'sneak' | 'lure' — προχωράει όταν το κάνει ο παίκτης
+//   time:  δευτ. — προχωράει μόνο του μετά από τόσο χρόνο (ή μέγιστος χρόνος για το until)
+//   title: { numeral, name, line } — αντί για κείμενο, δείχνει τον τίτλο κεφαλαίου
+//          στη μέση της οθόνης (μέσω του onTitle)
 const HINT_MIN_TIME = 2;     // κάθε οδηγία μένει τουλάχιστον τόσο (δευτ.)
-const HINT_GAP = 0.8;        // κενό ανάμεσα σε δύο οδηγίες
+const HINT_GAP = 0.8;        // κενό ανάμεσα σε δύο μηνύματα
 // Πόση ώρα πρέπει να κρατήσει μια "συνεχής" ενέργεια για να μετρήσει.
 const HINT_HOLD = { move: 0.8, sneak: 1.2 };
 
@@ -16,22 +21,30 @@ const Hints = {
   nextAt: 0,
   progress: 0,
   done: false,
+  onTitle: null,
 
   init(el) {
     this.el = el;
     this.touch = matchMedia('(pointer: coarse)').matches;
   },
 
+  // Αντικαθιστά ό,τι έδειχνε με νέα λίστα.
   start(list, now) {
-    this.list = list || [];
+    this.list = (list || []).slice();
     this.idx = -1;
     this.showing = false;
     this.nextAt = now + HINT_GAP;
     this.el.classList.remove('visible');
   },
 
+  // Προσθέτει μηνύματα στο τέλος της ουράς.
+  push(list) {
+    this.list.push(...list);
+  },
+
   stop() {
     this.list = [];
+    this.idx = -1;
     this.showing = false;
     this.el.classList.remove('visible');
   },
@@ -62,8 +75,12 @@ const Hints = {
     } else if (this.idx + 1 < this.list.length && now >= this.nextAt) {
       this.idx++;
       const h = this.list[this.idx];
-      this.el.textContent = this.touch ? h.touch : (h.keys || h.touch);
-      this.el.classList.add('visible');
+      if (h.title) {
+        if (this.onTitle) this.onTitle(h.title);
+      } else {
+        this.el.textContent = this.touch ? h.touch : (h.keys || h.touch);
+        this.el.classList.add('visible');
+      }
       this.showing = true;
       this.shownAt = now;
       this.progress = 0;

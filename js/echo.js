@@ -1,7 +1,6 @@
 'use strict';
 
-// Πόσο κρατάει το φως ενός τοίχου μετά το πέρασμα του κύματος (δευτ.).
-const ECHO_FADE = 1.5;
+// Πόσο κρατάει το φως ενός τοίχου: ανά κομμάτι, στο Level.segFade (1.5 δευτ., 0.5 στη Λήθη).
 // Ταχύτητα διάδοσης του κύματος (μονάδες κόσμου / δευτ.).
 const WAVE_SPEED = 430;
 // Επίπεδα διαφάνειας για ομαδοποιημένη σχεδίαση (λιγότερα stroke = πιο γρήγορα).
@@ -63,7 +62,8 @@ const Echoes = {
         const s = this.strengthAt(wave, h.d);
         // Ανανεώνουμε μόνο αν το νέο φως είναι πιο δυνατό από όσο έχει μείνει.
         const age = now - this.litTime[h.i];
-        const current = age < ECHO_FADE ? this.litStrength[h.i] * (1 - age / ECHO_FADE) : 0;
+        const fade = Level.segFade[h.i];
+        const current = age < fade ? this.litStrength[h.i] * (1 - age / fade) : 0;
         if (s > current) {
           this.litTime[h.i] = now;
           this.litStrength[h.i] = s;
@@ -91,11 +91,12 @@ const Echoes = {
 
     for (let i = 0; i < L.segCount; i++) {
       const age = now - this.litTime[i];
-      if (age >= ECHO_FADE) continue;
+      const fade = Level.segFade[i];
+      if (age >= fade) continue;
       const x1 = L.segX1[i], y1 = L.segY1[i];
       if (x1 < view.x0 - TILE || x1 > view.x1 + TILE ||
           y1 < view.y0 - TILE || y1 > view.y1 + TILE) continue;
-      const f = 1 - age / ECHO_FADE;
+      const f = 1 - age / fade;
       const a = this.litStrength[i] * f * Math.sqrt(f);
       if (a < 0.015) continue;
       const b = Math.min(ALPHA_BUCKETS - 1, Math.floor(a * ALPHA_BUCKETS));

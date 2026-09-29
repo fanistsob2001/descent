@@ -1,20 +1,30 @@
 'use strict';
 
-// Τα επίπεδα του παιχνιδιού, με σειρά δυσκολίας.
+// Τα 5 κεφάλαια του ενιαίου χάρτη (βλ. STORY.md, ενότητες 2, 3 και 8).
+// Τα κείμενα (name, line, objective) είναι ΑΚΡΙΒΩΣ όπως στο STORY.md.
 //
-// Χάρτης: # = τοίχος   . = διάδρομος   S = αφετηρία
-//         M = τέρας που περιφέρεται   G = τέρας-φρουρός (μένει κοντά στο σημείο του)
-//         E = έξοδος (πάνω στο εξωτερικό τείχος)
+// Κάθε κεφάλαιο είναι ένα μπλοκ χάρτη. Το Level.loadWorld τα βάζει το ένα
+// κάτω από το άλλο, ώστε το v (έξοδος προς τα κάτω) κάθε μπλοκ να ενώνεται με
+// το ^ (είσοδος από πάνω) του επόμενου.
 //
-// lures = πόσα δολώματα έχει ο παίκτης σε αυτό το επίπεδο.
-// hints = οδηγίες στην οθόνη, η μία μετά την άλλη.
-//   touch / keys: κείμενο για κινητό / υπολογιστή (αν λείπει το keys, χρησιμοποιείται το touch)
-//   until: 'move' | 'call' | 'sneak' | 'lure' — προχωράει όταν το κάνει ο παίκτης
-//   time:  δευτ. — προχωράει μόνο του μετά από τόσο χρόνο (ή μέγιστος χρόνος για το until)
-const LEVELS = [
+// Χάρτης: # = τοίχος   . = διάδρομος   S = αφετηρία (μόνο στο I)
+//         ^ = είσοδος από το προηγούμενο κεφάλαιο (στο πάνω τείχος)
+//         v = έξοδος προς το επόμενο κεφάλαιο (στο κάτω τείχος)
+//         C = βωμός / checkpoint (στην αρχή κάθε κεφαλαίου)
+//         M = σκιά που περιφέρεται   G = σκιά-φρουρός   E = η τελική έξοδος (μόνο στο V)
+//
+// objective(strings): το κείμενο του στόχου, με τον πραγματικό αριθμό χορδών.
+// lures:  πόσα δολώματα έχει τουλάχιστον ο παίκτης όταν ανάβει τον βωμό.
+// fade:   σε πόσα δευτ. σβήνουν οι τοίχοι (Λήθη: 0.5 αντί για 1.5).
+// hints:  οδηγίες μετά τον στόχο (ίδια μορφή με το js/hints.js).
+const CHAPTERS = [
   {
-    name: 'The Corridor',
+    numeral: 'I',
+    name: 'The Gate of Taenarum',
+    line: 'The living do not come down here. You did.',
+    objective: () => 'Your lyre is broken. Its three strings lie somewhere below. Find the way down.',
     lures: 0,
+    fade: 1.5,
     hints: [
       { touch: 'Drag on the left side of the screen to move.',
         keys: 'Move with WASD or the arrow keys.', until: 'move' },
@@ -22,11 +32,10 @@ const LEVELS = [
         keys: 'Press Space to make a sound. Hold it longer for a bigger wave.', until: 'call' },
       { touch: 'Push the stick only a little to walk silently. Running makes noise.',
         keys: 'Hold Shift to walk silently. Running makes noise.', until: 'sneak', time: 14 },
-      { touch: 'Find the exit. The door glows faintly when a wave touches it.', time: 7 },
     ],
     map: [
       '#############',
-      '#S....#.....#',
+      '#SC...#.....#',
       '#####.#.###.#',
       '#.....#...#.#',
       '#.#######.#.#',
@@ -36,20 +45,21 @@ const LEVELS = [
       '#####.#######',
       '#.....#.....#',
       '#.#####.###.#',
-      '#.......#...E',
-      '#############',
+      '#.......#...#',
+      '###########v#',
     ],
   },
   {
-    name: 'Something Listens',
+    numeral: 'II',
+    name: 'The Shore of Acheron',
+    line: 'The ferryman takes no one for free. Not even the dead.',
+    objective: (s) => `Find an obol to pay the ferryman. A string lies somewhere along the shore. Strings: ${s}/3`,
     lures: 0,
-    hints: [
-      { touch: 'Something is down here with you. It hears every sound you make.', time: 6 },
-      { touch: 'A red flash means it is close. Walk silently.', time: 6 },
-    ],
+    fade: 1.5,
+    hints: [],
     map: [
-      '#################',
-      '#S..#.......#...#',
+      '#^###############',
+      '#C..#.......#...#',
       '###.#.#####.#.#.#',
       '#...#.#...#...#.#',
       '#.###.#.#.#####.#',
@@ -70,21 +80,23 @@ const LEVELS = [
       '#...#.......#...#',
       '#.#########.###.#',
       '#...............#',
-      '###########E#####',
+      '###########v#####',
     ],
   },
   {
-    name: 'The Guard',
+    numeral: 'III',
+    name: 'The Waters of Lethe',
+    line: 'What you see here, you soon forget. Do not forget why you came.',
+    objective: (s) => `A string sank near the river. Strings: ${s}/3`,
     lures: 2,
+    fade: 0.5,
     hints: [
-      { touch: 'You found lures. Tap the speaker button (top right) to throw one where you are heading.',
-        keys: 'You found lures. Press E to throw one in the direction you are heading.', time: 8 },
-      { touch: 'After a second it makes loud noises. Monsters will go to it.', until: 'lure', time: 10 },
-      { touch: 'Something guards the exit. Lure it away.', time: 6 },
+      { touch: 'Tap the button at the top right to throw a lure where you are heading.',
+        keys: 'Press E to throw a lure in the direction you are heading.', until: 'lure', time: 10 },
     ],
     map: [
-      '###################',
-      '#S....#.........#.#',
+      '#^#################',
+      '#C....#.........#.#',
       '#.###.#.#######.#.#',
       '#.#...#.#.....#...#',
       '#.#.###.#.###.#####',
@@ -114,19 +126,21 @@ const LEVELS = [
       '#.#####.#########.#',
       '#.#.............#.#',
       '#.#.###########.#.#',
-      '#.......#....G....E',
-      '###################',
+      '#.......#....G....#',
+      '#################v#',
     ],
   },
   {
-    name: 'Two of Them',
+    numeral: 'IV',
+    name: 'The Palace of Hades',
+    line: 'The king of the dead has never heard a song.',
+    objective: (s) => `A string is hidden in the palace. Strings: ${s}/3`,
     lures: 2,
-    hints: [
-      { touch: 'There are two of them now.', time: 5 },
-    ],
+    fade: 1.5,
+    hints: [],
     map: [
-      '#######################',
-      '#S#...........#...#...#',
+      '#^#####################',
+      '#C#...........#...#...#',
       '#.#.###.#######.#.#.#.#',
       '#.#...#.........#...#.#',
       '#.###.#####.###.#####.#',
@@ -159,18 +173,22 @@ const LEVELS = [
       '#.#.....#...#...#...#.#',
       '#.###.###.#####.#.###.#',
       '#.....#.......#.......#',
-      '#############E#########',
+      '#############v#########',
     ],
   },
   {
-    name: 'The Last Door',
+    numeral: 'V',
+    name: 'The Ascent',
+    line: 'Behind you, footsteps. Hers. Do not look back.',
+    objective: (s) => (s === 3
+      ? 'Your lyre is whole. Play it when the shades come near.'
+      : 'Your lyre is still broken. You climb without its song.'),
     lures: 3,
-    hints: [
-      { touch: 'The last door. Stay quiet.', time: 5 },
-    ],
+    fade: 1.5,
+    hints: [],
     map: [
-      '#########################',
-      '#S#.............#.....#.#',
+      '#^#######################',
+      '#C#.............#.....#.#',
       '#.#####.#.#####.#.###.#.#',
       '#.......#...#...#.......#',
       '#######.#.#.#.#####.#.#.#',

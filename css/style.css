@@ -73,6 +73,7 @@ body {
   color: var(--bright);
   text-shadow: 0 0 18px rgba(120, 170, 255, 0.55);
   white-space: nowrap;
+  margin-bottom: 1.2rem;
 }
 
 .lead {
@@ -82,48 +83,21 @@ body {
   margin-bottom: 0.6rem;
 }
 
+.objective {
+  max-width: 320px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.75;
+  margin-bottom: 0.8rem;
+}
+
 .small-label {
   font-family: system-ui, sans-serif;
   font-size: 0.75rem;
   letter-spacing: 0.25em;
   text-transform: uppercase;
   opacity: 0.5;
-}
-
-.level-select {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.7rem;
-  margin-top: 0.8rem;
-}
-
-#level-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-#level-buttons button {
-  width: 46px;
-  height: 46px;
-  font: inherit;
-  font-size: 1.05rem;
-  color: var(--bright);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-#level-buttons button:disabled {
-  opacity: 0.2;
-  cursor: default;
-}
-
-#level-buttons button.current {
-  border-color: rgba(200, 220, 255, 0.8);
-  box-shadow: 0 0 12px rgba(120, 170, 255, 0.35);
 }
 
 .headphones {
@@ -180,8 +154,7 @@ body {
   background: rgba(200, 220, 255, 0.06);
 }
 
-.btn:active,
-#level-buttons button:not(:disabled):active {
+.btn:active {
   background: rgba(200, 220, 255, 0.16);
 }
 
@@ -336,7 +309,7 @@ body {
 }
 
 #level-intro.show {
-  animation: intro 3.2s ease forwards;
+  animation: intro 5s ease forwards;
 }
 
 #intro-number {
@@ -354,10 +327,19 @@ body {
   text-shadow: 0 0 16px rgba(120, 170, 255, 0.45);
 }
 
+#intro-line {
+  max-width: 320px;
+  margin-top: 0.6rem;
+  padding: 0 16px;
+  font-style: italic;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
 @keyframes intro {
   0% { opacity: 0; }
-  20% { opacity: 1; }
-  65% { opacity: 1; }
+  14% { opacity: 1; }
+  78% { opacity: 1; }
   100% { opacity: 0; }
 }
 

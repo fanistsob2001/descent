@@ -6,8 +6,10 @@ const DREAD_NEAR = 40;       // σε αυτή την απόσταση (ή πιο
 const DREAD_FAR = 400;       // πέρα από εδώ είναι 0
 const SHAKE_FROM = 0.72;     // πάνω από αυτό το επίπεδο τρόμου η οθόνη τρέμει
 
-// Δόνηση όπου υποστηρίζεται (Android). Στο iPhone απλώς δεν κάνει τίποτα.
+// Δόνηση όπου υποστηρίζεται (Android) και αν δεν την έχει κλείσει ο παίκτης.
+// Στο iPhone απλώς δεν κάνει τίποτα.
 function vibrate(pattern) {
+  if (!Settings.vibration) return;
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (_) { /* - */ }
 }
 

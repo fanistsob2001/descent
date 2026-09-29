@@ -14,33 +14,34 @@ const VIEW_MIN_W = 440;
 const VIEW_MIN_H = 700;
 
 // Πόσο κρατάει η "στιγμή" του θανάτου (jump scare + κόκκινο σβήσιμο)
-// πριν βγει η οθόνη Game Over (δευτ.).
+// πριν ο παίκτης ξαναβγεί στον τελευταίο βωμό (δευτ.).
 const DEATH_DELAY = 1.7;
 
 // Ένταση του ambient βουητού ανά κατάσταση.
-const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, cleared: 0.5, end: 0.5 };
+const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, end: 0.5 };
 
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
-  menu: $('menu'), pause: $('pause'), gameover: $('gameover'), cleared: $('cleared'), end: $('end'),
+  menu: $('menu'), settings: $('settings'), pause: $('pause'), end: $('end'),
 };
 const hudEl = $('hud');
 const lureBtn = $('btn-lure');
 
 // ---- Κατάσταση ----
 let cssW = 0, cssH = 0, dpr = 1, scale = 1;
-// 'menu' | 'play' | 'paused' | 'dead' | 'cleared' | 'end'
+// 'menu' | 'play' | 'paused' | 'dead' | 'end'
 let state = 'menu';
-let levelIndex = 0;
+let chapter = -1;        // ο τελευταίος βωμός που άναψε (-1 = κανένας ακόμα)
+let strings = 0;         // χορδές της λύρας (στάδιο 2)
+let hudRegion = -1;      // σε ποιο κεφάλαιο δείχνει τώρα το HUD
 let gameTime = 0;
 let lastFrame = 0;
-let runStart = 0;        // πότε ξεκίνησε η τωρινή προσπάθεια
-let endTime = 0;         // πότε πέθανε / τελείωσε το επίπεδο
+let endTime = 0;         // πότε πέθανε
 let monsters = [];
-let killer = null;       // το τέρας που έπιασε τον παίκτη
+let killer = null;       // η σκιά που έπιασε τον παίκτη
 let showMap = false;     // βοήθεια για δοκιμές: πλήκτρο M
 
 // fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το δόλωμα.
@@ -148,6 +149,7 @@ function draw() {
   if (showMap) drawDebugMap();
 
   Echoes.draw(ctx, gameTime, view, scale);
+  Altars.draw(ctx, gameTime, view);
   ExitDoor.draw(ctx, gameTime);
   Lures.draw(ctx, gameTime);
 
@@ -266,8 +268,13 @@ function frame(t) {
     Hints.update(gameTime);
 
     killer = monsters.find((m) => m.touches(player)) || null;
+    const lit = killer ? -1 : Altars.check(player, gameTime);
     if (killer) die();
-    else if (ExitDoor.reached(player)) levelCleared();
+    else if (lit >= 0) lightAltar(lit);
+    else if (ExitDoor.reached(player)) reachedExit();
+
+    const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+    if (region !== hudRegion) updateHud();
 
     // Η κάμερα ακολουθεί τον παίκτη απαλά.
     const follow = 1 - Math.pow(0.001, dt);
@@ -276,9 +283,10 @@ function frame(t) {
   } else if (state === 'dead') {
     gameTime += dt;
     Echoes.update(dt, gameTime);
-    if (gameTime - endTime >= DEATH_DELAY && screens.gameover.classList.contains('hidden')) {
-      showScreen('gameover');
+    // Μετά το jump scare: πίσω στον τελευταίο βωμό, με ό,τι είχες εκεί.
+    if (gameTime - endTime >= DEATH_DELAY) {
       Sound.gameOver();
+      continueGame();
     }
   }
 
@@ -295,37 +303,46 @@ function frame(t) {
 function showScreen(name) {
   for (const key in screens) screens[key].classList.toggle('hidden', key !== name);
   hudEl.classList.toggle('hidden', state !== 'play' && state !== 'paused');
-  if (name === 'menu') buildLevelButtons();
+  if (name === 'menu') {
+    // Continue μόνο αν υπάρχει save· τότε είναι και το κύριο κουμπί (Enter).
+    const hasSave = Save.exists();
+    $('btn-continue').classList.toggle('hidden', !hasSave);
+    $('btn-continue').classList.toggle('primary', hasSave);
+    $('btn-new').classList.toggle('primary', !hasSave);
+  }
+  if (name === 'pause') {
+    const ch = CHAPTERS[Math.max(0, chapter)];
+    $('pause-chapter').textContent = `${ch.numeral}. ${ch.name}`;
+    $('pause-objective').textContent = ch.objective(strings);
+  }
 }
 
-function buildLevelButtons() {
-  const box = $('level-buttons');
-  box.textContent = '';
-  for (let i = 0; i < LEVELS.length; i++) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = String(i + 1);
-    const locked = i + 1 > Progress.unlocked;
-    b.disabled = locked;
-    b.setAttribute('aria-label', locked ? `Level ${i + 1} (locked)` : `Level ${i + 1}`);
-    if (i + 1 === Progress.unlocked) b.classList.add('current');
-    b.addEventListener('click', () => { blurButtons(); startLevel(i); });
-    box.appendChild(b);
+function updateToggleLabels() {
+  for (const b of document.querySelectorAll('.sound-toggle')) {
+    b.textContent = Settings.sound ? 'Sound: on' : 'Sound: off';
+  }
+  for (const b of document.querySelectorAll('.vibration-toggle')) {
+    b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
   }
 }
 
 function updateHud() {
-  const total = LEVELS[levelIndex].lures;
-  lureBtn.classList.toggle('invisible', total === 0);   // κρατάει τη θέση του, για να μένει κεντραρισμένο το label
+  // Το κουμπί του δολώματος εμφανίζεται από το κεφάλαιο που δίνει τα πρώτα δολώματα.
+  const hasLures = Lures.left > 0 || CHAPTERS.slice(0, chapter + 1).some((c) => c.lures > 0);
+  lureBtn.classList.toggle('invisible', !hasLures);   // κρατάει τη θέση του, για να μένει κεντραρισμένο το label
   lureBtn.classList.toggle('empty', Lures.left === 0);
   $('lure-count').textContent = String(Lures.left);
-  $('level-label').textContent = `Level ${levelIndex + 1}`;
+  const r = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+  hudRegion = r;
+  $('level-label').textContent = r >= 0 ? CHAPTERS[r].numeral : '';
 }
 
-function showLevelIntro() {
+// Τίτλος κεφαλαίου στη μέση της οθόνης (καλείται από την ουρά μηνυμάτων).
+function showChapterTitle(ch) {
   const el = $('level-intro');
-  $('intro-number').textContent = `Level ${levelIndex + 1}`;
-  $('intro-name').textContent = LEVELS[levelIndex].name;
+  $('intro-number').textContent = ch.numeral;
+  $('intro-name').textContent = ch.name;
+  $('intro-line').textContent = ch.line;
   el.classList.remove('show');
   void el.offsetWidth;   // ξαναξεκινάει το CSS animation
   el.classList.add('show');
@@ -363,41 +380,75 @@ function setState(s) {
   Sound.setAmbient(AMBIENT[s]);
 }
 
-// Ξεκινάει (ή ξαναξεκινάει) το επίπεδο i (0 = πρώτο).
-function startLevel(i) {
-  Sound.unlock();   // πρέπει να γίνει μέσα στο πάτημα του κουμπιού (iPhone)
-  goFullscreen();
-  levelIndex = i;
-  const lv = LEVELS[i];
+// Τα μηνύματα που βγαίνουν όταν ανάβει ο βωμός ενός κεφαλαίου (STORY.md, ενότητα 2).
+function chapterMessages(i) {
+  const ch = CHAPTERS[i];
+  return [
+    { touch: 'The flame is lit. Your progress is saved.', time: 3.5 },
+    { title: ch, time: 5 },
+    { touch: ch.objective(strings), time: 8 },
+    // Η οδηγία κίνησης έχει ήδη φανεί στην αρχή (και για να φτάσει εδώ, ο παίκτης κινήθηκε).
+    ...ch.hints.filter((h) => h.until !== 'move'),
+  ];
+}
 
-  Level.load(lv.map);
+// Βάζει τον παίκτη στον κόσμο με την κατάσταση ενός save.
+// saved = { chapter, lures } — chapter -1 = καινούργιο παιχνίδι (από την αφετηρία).
+function spawn(saved) {
+  goFullscreen();
+  chapter = saved.chapter;
+  strings = 0;   // οι χορδές έρχονται στο στάδιο 2
+
   Echoes.init();
-  monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard));
+  monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard, m.region));
   killer = null;
   ExitDoor.reset();
-  Lures.reset(lv.lures);
-  Echoes.listeners = [...monsters, ExitDoor];
+  Altars.reset(chapter);
+  Lures.reset(saved.lures);
+  Echoes.listeners = [...monsters, ExitDoor, ...Altars.list];
 
-  player.x = camera.x = Level.start.x;
-  player.y = camera.y = Level.start.y;
+  const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
+  player.x = camera.x = at.x;
+  player.y = camera.y = at.y;
   player.stepDist = 0;
-  // Αρχική κατεύθυνση: προς τον πρώτο ανοιχτό διάδρομο.
+  // Αρχική κατεύθυνση: προς τον πρώτο ανοιχτό διάδρομο (προτιμάει κάτω και δεξιά).
   const stx = Math.floor(player.x / TILE), sty = Math.floor(player.y / TILE);
-  const open = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
+  const open = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
   [player.fx, player.fy] = open || [0, 1];
 
   stopInput();
   Dread.reset();
   setState('play');
-  runStart = gameTime;
   showScreen(null);
   updateHud();
-  showLevelIntro();
-  Hints.start(lv.hints, gameTime);
+  // Καινούργιο παιχνίδι: πρώτα πώς κινείσαι (ο πρώτος βωμός είναι ένα βήμα μακριά).
+  // Μετά από θάνατο / Continue: θύμισε τον στόχο του κεφαλαίου.
+  Hints.start(chapter >= 0
+    ? [{ touch: CHAPTERS[chapter].objective(strings), time: 6 }]
+    : CHAPTERS[0].hints.filter((h) => h.until === 'move'), gameTime);
 
   // Μια πρώτη ανάσα: ένα μέτριο κύμα για να δεις πού βρίσκεσαι.
   Echoes.emit(player.x, player.y, 220, 0.6, 'call');
   Sound.ping(0.3);
+}
+
+function newGame() {
+  Save.clear();
+  spawn({ chapter: -1, lures: 0 });
+}
+
+function continueGame() {
+  spawn(Save.load() || { chapter: -1, lures: 0 });
+}
+
+// Ο παίκτης έφτασε στον βωμό του κεφαλαίου i.
+function lightAltar(i) {
+  chapter = i;
+  Lures.left = Math.max(Lures.left, CHAPTERS[i].lures);
+  Save.write({ chapter: i, lures: Lures.left });
+  Sound.win();
+  updateHud();
+  Hints.start(chapterMessages(i), gameTime);
 }
 
 function die() {
@@ -411,23 +462,13 @@ function die() {
   vibrate([250, 60, 500]);
 }
 
-function levelCleared() {
-  endTime = gameTime;
+// Προσωρινό τέλος — τα δύο κανονικά τέλη έρχονται στο στάδιο 3.
+function reachedExit() {
+  setState('end');
   stopInput();
   Hints.stop();
-  Progress.unlock(levelIndex + 2);
   Sound.win();
-
-  if (levelIndex + 1 >= LEVELS.length) {
-    setState('end');
-    showScreen('end');
-    return;
-  }
-  setState('cleared');
-  const secs = Math.floor(endTime - runStart);
-  $('cleared-title').textContent = `Level ${levelIndex + 1} cleared`;
-  $('cleared-time').textContent = `Time ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  showScreen('cleared');
+  showScreen('end');
 }
 
 function pauseGame() {
@@ -450,22 +491,25 @@ function goToMenu() {
   showScreen('menu');
 }
 
-function updateMuteLabel() {
-  $('btn-mute').textContent = Sound.muted ? 'Sound: off' : 'Sound: on';
-}
-
 function doAction(action) {
-  Sound.unlock();
+  Sound.unlock();   // πρέπει να γίνει μέσα στο πάτημα του κουμπιού (iPhone)
   blurButtons();
-  if (action === 'play') startLevel(Progress.unlocked - 1);
+  if (action === 'new') newGame();
+  else if (action === 'continue') continueGame();
+  else if (action === 'settings') showScreen('settings');
+  else if (action === 'back') showScreen('menu');
   else if (action === 'resume') resumeGame();
-  else if (action === 'restart') startLevel(levelIndex);
-  else if (action === 'next') startLevel(levelIndex + 1);
   else if (action === 'menu') goToMenu();
-  else if (action === 'mute') { Sound.setMuted(!Sound.muted); updateMuteLabel(); }
+  else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
+  else if (action === 'vibration') {
+    Settings.vibration = !Settings.vibration;
+    Settings.store();
+    updateToggleLabels();
+    vibrate(40);   // μικρό "τσίμπημα" για να νιώσεις ότι άνοιξε
+  }
 }
 
-// Η ορατή οθόνη (αν υπάρχει) και το κύριο κουμπί της.
+// Η ορατή οθόνη (αν υπάρχει).
 function visibleScreen() {
   for (const key in screens) {
     if (!screens[key].classList.contains('hidden')) return screens[key];
@@ -475,10 +519,15 @@ function visibleScreen() {
 
 // ---- Έναρξη ----
 function init() {
-  Progress.load();
+  Settings.load();
   Sound.loadSettings();
-  updateMuteLabel();
+  updateToggleLabels();
   Hints.init($('hint'));
+  Hints.onTitle = showChapterTitle;
+
+  Level.loadWorld(CHAPTERS);
+  player.x = camera.x = Level.start.x;
+  player.y = camera.y = Level.start.y;
 
   Input.now = () => gameTime;
   Input.onRelease = emitCall;
@@ -495,7 +544,7 @@ function init() {
       // Enter = το κύριο κουμπί της οθόνης που φαίνεται.
       e.preventDefault();
       const scr = visibleScreen();
-      const primary = scr && scr.querySelector('.primary');
+      const primary = scr && scr.querySelector('.primary:not(.hidden)');
       if (primary) doAction(primary.dataset.action);
     } else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (state === 'play') pauseGame();

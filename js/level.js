@@ -7,14 +7,16 @@ const TILE = 40;
 // που φωτίζονται ανεξάρτητα όταν τα ακουμπάει το κύμα.
 const WALL_SAMPLE_STEP = 5;
 
-// Οι χάρτες των επιπέδων βρίσκονται στο js/levels.js.
+// Οι χάρτες των κεφαλαίων βρίσκονται στο js/levels.js.
 
 const Level = {
   cols: 0,
   rows: 0,
   grid: null,          // Uint8Array, 1 = τοίχος
+  region: null,        // Int8Array: σε ποιο κεφάλαιο ανήκει κάθε κελί (-1 = γέμισμα)
   start: { x: 0, y: 0 },
-  monsters: [],        // { x, y, guard } — θέσεις εκκίνησης των τεράτων
+  monsters: [],        // { x, y, guard, region } — θέσεις εκκίνησης των σκιών
+  altars: [],          // { x, y, tx, ty } — ένας βωμός ανά κεφάλαιο, με τη σειρά
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -23,30 +25,63 @@ const Level = {
   // Σημείο ελέγχου κάθε κομματιού: λίγο έξω από τον τοίχο, μέσα στον διάδρομο,
   // ώστε ο έλεγχος οπτικής επαφής να μην "χτυπάει" τον ίδιο τον τοίχο.
   testX: null, testY: null,
+  segFade: null,       // σε πόσα δευτ. σβήνει κάθε κομμάτι (Λήθη = πιο γρήγορα)
 
-  load(map) {
-    this.rows = map.length;
-    this.cols = map[0].length;
-    this.grid = new Uint8Array(this.cols * this.rows);
-    this.monsters = [];
-
-    for (let y = 0; y < this.rows; y++) {
-      for (let x = 0; x < this.cols; x++) {
-        const c = map[y][x] || '#';
-        this.grid[y * this.cols + x] = c === '#' ? 1 : 0;
-        const cx = (x + 0.5) * TILE, cy = (y + 0.5) * TILE;
-        if (c === 'S') { this.start.x = cx; this.start.y = cy; }
-        if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G' });
-        if (c === 'E') { this.exit.tx = x; this.exit.ty = y; this.exit.x = cx; this.exit.y = cy; }
-      }
+  // Ενώνει τα κεφάλαια σε έναν χάρτη: το ένα κάτω από το άλλο, μετατοπισμένα
+  // οριζόντια ώστε το v κάθε κεφαλαίου να πέφτει ακριβώς πάνω από το ^ του επόμενου.
+  loadWorld(chapters) {
+    const col = (map, row, ch) => map[row].indexOf(ch);
+    const offsets = [0];
+    for (let i = 1; i < chapters.length; i++) {
+      const prev = chapters[i - 1].map;
+      offsets.push(offsets[i - 1] + col(prev, prev.length - 1, 'v') - col(chapters[i].map, 0, '^'));
     }
+    const minOff = Math.min(...offsets);
+    for (let i = 0; i < offsets.length; i++) offsets[i] -= minOff;
+
+    this.cols = Math.max(...chapters.map((c, i) => offsets[i] + c.map[0].length));
+    this.rows = chapters.reduce((sum, c) => sum + c.map.length, 0);
+    this.grid = new Uint8Array(this.cols * this.rows).fill(1);
+    this.region = new Int8Array(this.cols * this.rows).fill(-1);
+    this.monsters = [];
+    this.altars = [];
+
+    let top = 0;
+    chapters.forEach((ch, r) => {
+      ch.map.forEach((line, y) => {
+        for (let x = 0; x < line.length; x++) {
+          const wx = offsets[r] + x, wy = top + y;
+          const i = wy * this.cols + wx;
+          const c = line[x];
+          this.grid[i] = c === '#' ? 1 : 0;
+          this.region[i] = r;
+          const cx = (wx + 0.5) * TILE, cy = (wy + 0.5) * TILE;
+          if (c === 'S') { this.start.x = cx; this.start.y = cy; }
+          if (c === 'C') this.altars[r] = { x: cx, y: cy, tx: wx, ty: wy };
+          if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G', region: r });
+          if (c === 'E') { this.exit.tx = wx; this.exit.ty = wy; this.exit.x = cx; this.exit.y = cy; }
+        }
+      });
+      top += ch.map.length;
+    });
 
     this.buildSegments();
+    this.segFade = new Float32Array(this.segCount);
+    for (let i = 0; i < this.segCount; i++) {
+      // Το κομμάτι ανήκει στο κεφάλαιο του διαδρόμου μπροστά του.
+      const r = this.regionAt(Math.floor(this.testX[i] / TILE), Math.floor(this.testY[i] / TILE));
+      this.segFade[i] = r >= 0 ? chapters[r].fade : 1.5;
+    }
   },
 
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
     return this.grid[ty * this.cols + tx] === 1;
+  },
+
+  regionAt(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return -1;
+    return this.region[ty * this.cols + tx];
   },
 
   // Σπρώχνει έναν κύκλο { x, y, r } έξω από τους τοίχους.
@@ -127,13 +162,19 @@ const Level = {
   },
 
   // Τυχαίο κελί διαδρόμου σε απόσταση minSteps..maxSteps (σε κελιά) από το (sx, sy).
-  randomFloorNear(sx, sy, minSteps, maxSteps) {
+  // Αν δοθεί region, μόνο κελιά αυτού του κεφαλαίου (οι σκιές δεν αλλάζουν κεφάλαιο).
+  randomFloorNear(sx, sy, minSteps, maxSteps, region) {
     const { dist } = this.bfs(sx, sy, maxSteps);
     const options = [];
     for (let i = 0; i < dist.length; i++) {
+      if (dist[i] < minSteps || dist[i] > maxSteps) continue;
+      if (region !== undefined && this.region[i] !== region) continue;
       const tx = i % this.cols, ty = (i / this.cols) | 0;
       if (tx === this.exit.tx && ty === this.exit.ty) continue;
-      if (dist[i] >= minSteps && dist[i] <= maxSteps) options.push([tx, ty]);
+      // Ούτε στις ενώσεις ανάμεσα στα κεφάλαια (τα κελιά ^ / v πάνω στα τείχη).
+      if (this.isWall(tx - 1, ty) && this.isWall(tx + 1, ty) &&
+          this.regionAt(tx, ty - 1) !== this.regionAt(tx, ty + 1)) continue;
+      options.push([tx, ty]);
     }
     if (options.length === 0) return [sx, sy];
     return options[Math.floor(Math.random() * options.length)];

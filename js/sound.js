@@ -9,7 +9,7 @@
 //
 // Το AudioContext δημιουργείται στο πρώτο πάτημα κουμπιού (unlock), γιατί οι
 // browsers — ειδικά το iPhone — δεν αφήνουν ήχο πριν αγγίξει ο χρήστης κάτι.
-const SOUND_MUTE_KEY = 'silent-escape-muted';
+// Η ρύθμιση ήχος on/off αποθηκεύεται στο Settings (js/save.js).
 
 const Sound = {
   ctx: null,
@@ -25,7 +25,7 @@ const Sound = {
   listenerY: 0,
 
   loadSettings() {
-    try { this.muted = localStorage.getItem(SOUND_MUTE_KEY) === '1'; } catch (_) { /* - */ }
+    this.muted = !Settings.sound;
   },
 
   // Καλείται μέσα σε click / keydown handler.
@@ -140,7 +140,8 @@ const Sound = {
 
   setMuted(m) {
     this.muted = m;
-    try { localStorage.setItem(SOUND_MUTE_KEY, m ? '1' : '0'); } catch (_) { /* - */ }
+    Settings.sound = !m;
+    Settings.store();
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05);
   },
 

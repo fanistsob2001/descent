@@ -14,11 +14,13 @@ const GUARD_RANGE = 4;
 
 class Monster {
   // guard = true: όταν δεν κυνηγάει, γυρίζει και φυλάει κοντά στο σημείο εκκίνησης.
-  constructor(x, y, guard) {
+  // region = το κεφάλαιο της σκιάς: δεν βγαίνει ποτέ από αυτό.
+  constructor(x, y, guard, region) {
     this.x = x;
     this.y = y;
     this.r = MONSTER_RADIUS;
     this.guard = guard;
+    this.region = region;
     this.homeTx = Math.floor(x / TILE);
     this.homeTy = Math.floor(y / TILE);
     this.state = 'wander';     // 'wander' | 'hunt' | 'search'
@@ -52,6 +54,8 @@ class Monster {
 
     const range = los ? wave.radius : wave.radius * MONSTER_MUFFLED_RANGE;
     if (d > range) return;
+    // Ήχοι από άλλο κεφάλαιο δεν την τραβάνε έξω από το δικό της.
+    if (Level.regionAt(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE)) !== this.region) return;
 
     this.state = 'hunt';
     this.soundX = wave.x;
@@ -85,15 +89,15 @@ class Monster {
         this.state = 'wander';
       } else {
         const sx = Math.floor(this.soundX / TILE), sy = Math.floor(this.soundY / TILE);
-        const [tx, ty] = Level.randomFloorNear(sx, sy, 1, 3);
+        const [tx, ty] = Level.randomFloorNear(sx, sy, 1, 3, this.region);
         this.goTo(tx, ty);
         return;
       }
     }
 
     const [tx, ty] = this.guard
-      ? Level.randomFloorNear(this.homeTx, this.homeTy, 0, GUARD_RANGE)
-      : Level.randomFloorNear(cx, cy, 4, 12);
+      ? Level.randomFloorNear(this.homeTx, this.homeTy, 0, GUARD_RANGE, this.region)
+      : Level.randomFloorNear(cx, cy, 4, 12, this.region);
     this.goTo(tx, ty);
   }
 
