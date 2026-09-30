@@ -99,6 +99,7 @@ const Echoes = {
 
       while (wave.cptr < wave.cells.length && wave.cells[wave.cptr].d <= wave.r) {
         const h = wave.cells[wave.cptr++];
+        Level.seen[h.c] = 1;   // για τον χάρτη: αυτό το κομμάτι το "είδε" ο ήχος
         const s = this.strengthAt(wave, h.d);
         const fade = Level.regionFade[Level.region[h.c]] || 1.5;
         const age = now - this.cellTime[h.c];

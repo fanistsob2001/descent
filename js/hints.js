@@ -127,6 +127,7 @@ const Notice = {
         const next = this.then;
         this.then = null;
         this.show(next.text, now, next.time);
+        if (next.who) Voice.say(next.text, next.who);
         return;
       }
       this.until = 0;

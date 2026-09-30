@@ -179,7 +179,7 @@ function shadeSpeaks(m) {
   if (gameTime - (m.spokeAt || -1e6) < 9 || gameTime - lastShadeVoice < 3.5) return;
   m.spokeAt = lastShadeVoice = gameTime;
   const line = STORY.shadeLines[Math.floor(Math.random() * STORY.shadeLines.length)];
-  const d = Voice.say(line, 'shade', { x: m.x, y: m.y });
+  const d = Voice.say(line, m.voice, { x: m.x, y: m.y });
   if (!Notice.busy(gameTime)) Notice.show(line, gameTime, d + 1, null, 'shade');
 }
 
@@ -196,7 +196,7 @@ function playerRegion() {
 function lookBack() {
   Eurydice.lose(gameTime);
   const d = Voice.say(STORY.whisper, 'eurydice', { x: Eurydice.x, y: Eurydice.y, fade: true });
-  Notice.show(STORY.whisper, gameTime, Math.max(2.5, d + 0.6), { text: STORY.footstepsStop, time: 6 });
+  Notice.show(STORY.whisper, gameTime, Math.max(2.5, d + 0.6), { text: STORY.footstepsStop, time: 6, who: 'narrator' });
   Notice.el.classList.add('whisper');
 }
 
@@ -222,7 +222,7 @@ function pickUp(it) {
   if (it.kind === 'jar') {
     Jars.left++;
     Sound.jarPickup();
-    Notice.show(STORY.jar, gameTime, 6);
+    Notice.show(STORY.jar, gameTime, Math.max(6, Voice.say(STORY.jar, 'narrator') + 1));
     if (!jarsFound) Hints.push(JAR_HINTS);
     jarsFound = true;
   } else if (it.kind === 'obol') {
@@ -234,7 +234,7 @@ function pickUp(it) {
     if (strings < 3) {
       Notice.show(STORY.string(strings), gameTime, 4);
     } else {
-      Notice.show(STORY.lyreWhole, gameTime, 7);
+      Notice.show(STORY.lyreWhole, gameTime, Math.max(7, Voice.say(STORY.lyreWhole, 'narrator', { delay: 0.6 }) + 1.5));
       Melody.uses = MELODY_USES;
       Hints.push(MELODY_HINTS);
     }
@@ -517,9 +517,10 @@ function drawDeathFlash(w = cssW, h = cssH) {
 }
 
 // ---- Χάρτης του παίκτη ----
-// Δείχνει ΜΟΝΟ τη μορφή του χώρου (δάπεδο, νερό, χάσματα, τοίχοι) των κεφαλαίων που έχεις
-// φτάσει, και πού είσαι — όχι σκιές, αντικείμενα, ψυχές ή την έξοδο. Το παιχνίδι σταματάει
-// όσο είναι ανοιχτός. Ζωγραφίζεται σε pixel art: κάθε κελί = λίγα art pixels.
+// Δείχνει ΜΟΝΟ τη μορφή του χώρου (δάπεδο, νερό, χάσματα, τοίχοι) που έχεις ήδη ανακαλύψει
+// (Level.seen: ό,τι φώτισε κύμα ή όπου περπάτησες), και πού είσαι — όχι σκιές, αντικείμενα,
+// ψυχές ή την έξοδο. Το παιχνίδι σταματάει όσο είναι ανοιχτός. Ζωγραφίζεται σε pixel art:
+// κάθε κελί = λίγα art pixels.
 let mapBounds = null;   // για κάθε κεφάλαιο: { x0, x1, y0, y1 } σε κελιά
 
 function regionBounds() {
@@ -550,7 +551,7 @@ function drawMap(pc, W, H) {
   const L = Level;
   const shown = (tx, ty) => {
     const r = L.regionAt(tx, ty);
-    return r >= 0 && r <= reached;
+    return r >= 0 && r <= reached && L.seen[ty * L.cols + tx] === 1;
   };
   const ty0 = Math.max(0, Math.floor(-oy / cell)), ty1 = Math.min(L.rows - 1, Math.ceil((H - oy) / cell));
   const tx0 = Math.max(0, Math.floor(-ox / cell)), tx1 = Math.min(L.cols - 1, Math.ceil((W - ox) / cell));
@@ -672,6 +673,8 @@ function frame(t) {
     const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
     if (region !== hudRegion) updateHud();
     Eurydice.update(player);
+    // Όπου περπατάς, το "βλέπεις" (για τον χάρτη), ακόμα και χωρίς κύμα.
+    Level.seen[Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE)] = 1;
     if (Eurydice.wantsToSpeak(gameTime) && lookBackRuleActive() && !Notice.busy(gameTime)) {
       const d = Voice.say(STORY.eurydiceFollow, 'eurydice', { x: Eurydice.x, y: Eurydice.y });
       Notice.show(STORY.eurydiceFollow, gameTime, d + 1.2, null, 'whisper');
@@ -751,6 +754,7 @@ function showChapterTitle(ch) {
   $('intro-number').textContent = ch.numeral;
   $('intro-name').textContent = ch.name;
   $('intro-line').textContent = ch.line;
+  Voice.say(ch.line, 'narrator', { delay: 0.8 });
   el.classList.remove('show');
   void el.offsetWidth;   // ξαναξεκινάει το CSS animation
   el.classList.add('show');
@@ -805,10 +809,15 @@ function spawn(saved) {
   strings = saved.strings;
   hasObol = saved.obol;
   jarsFound = saved.jars > 0 || saved.taken.some((id) => Level.items[id] && Level.items[id].kind === 'jar');
+  // Ο χάρτης θυμάται ό,τι έχεις δει: μετά από θάνατο κρατάει και όσα είδες μετά τον βωμό.
+  Level.mergeSeen(saved.seen);
 
   Echoes.init();
   monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard, m.region));
-  for (const m of monsters) m.onSense = shadeSpeaks;
+  monsters.forEach((m, i) => {
+    m.onSense = shadeSpeaks;
+    m.voice = i % 2 ? 'shadeF' : 'shade';   // μισές σκιές με αντρική, μισές με γυναικεία φωνή
+  });
   killer = null;
   ExitDoor.reset();
   Altars.reset(chapter);
@@ -860,6 +869,7 @@ function playCutscene(lines, style, art, then, who) {
 
 function newGame() {
   Save.clear();
+  Level.seen.fill(0);
   goFullscreen();
   playCutscene(STORY.intro, '', 'intro', () => spawn(Save.fresh()), STORY.introWho);
 }
@@ -887,7 +897,7 @@ function lightAltar(i) {
   if (strings >= 3) Melody.uses = MELODY_USES;
   Save.write({
     chapter: i, jars: Jars.left, strings, obol: hasObol, paid: Charon.paid,
-    melody: Melody.uses, taken: Items.takenIds(),
+    melody: Melody.uses, taken: Items.takenIds(), seen: Level.seenString(),
   });
   Sound.win();
   updateHud();

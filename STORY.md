@@ -178,11 +178,14 @@ Every line of dialogue is voiced, always with subtitles. Voices are synthesized 
 
 | Speaker | Voice | Lines |
 |---|---|---|
-| Narrator | warm, calm | Intro cutscene; the narration lines of the middle cutscene and of both endings |
-| Charon | very deep, slow, gravelly | Both Charon lines |
-| Hades | deep, heavy | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
-| Eurydice | soft, high, breathy whisper | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) · Good ending: "You didn't look..." |
-| Shades | distorted, eerie whisper/moan, from where the shade is | "Who is there?" · "I hear life..." |
-| Lost souls | whispered, from where the inscription is | Each inscription is spoken when a wave touches it |
+| Narrator | warm, calm (male) | Intro cutscene; the narration lines of the middle cutscene and of both endings; in the game: each chapter line, "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
+| Orpheus | young man, warm, melodic | "Good boy. Good boy. Good boy." (to Cerberus) |
+| Charon | very deep, slow, gravelly (old man) | Both Charon lines |
+| Hades | deep, heavy (male) | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
+| Eurydice | soft, high, breathy whisper (female) | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) · Good ending: "You didn't look..." |
+| Shades | distorted, eerie whisper/moan, from where the shade is; half of the shades male, half female | "Who is there?" · "I hear life..." |
+| Lost souls | whispered, from where the inscription is: souls 1 and 4 a man, soul 2 an old man, souls 3, 5 and 6 a woman | Each inscription is spoken when a wave touches it |
 
 Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
+
+Not voiced (they are interface text, not something a character says): the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.

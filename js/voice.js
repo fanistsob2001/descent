@@ -10,13 +10,25 @@
 //   range: πόσα ημιτόνια ανεβοκατεβαίνει, cut: lowpass, crush: "8-bit" παραμόρφωση (0..1),
 //   breath: θόρυβος ανάσας (0..1), wobble: τρέμουλο τόνου (ημιτόνια), vol: ένταση,
 //   whisper: μόνο θόρυβος μέσα από formants (ψίθυρος), reverb: πόσο στη σπηλιά.
+//   fmt: πόσο ψηλά είναι τα formants — το "μέγεθος" του λαιμού, αυτό που κάνει μια φωνή να
+//        ακούγεται αντρική (< 1) ή γυναικεία (> 1), πέρα από το ύψος f0.
+//   hum: σε ψίθυρο, λίγος τόνος στο f0 από κάτω, για να ακούγεται αν είναι άντρας ή γυναίκα.
 const VOICES = {
-  narrator: { wave: 'pulse', f0: 150, syl: 0.13, range: 3, cut: 2600, crush: 0.25, breath: 0.05, wobble: 0.1, vol: 0.2, reverb: 0.35 },
-  charon:   { wave: 'sawtooth', f0: 62, syl: 0.2, range: 2, cut: 1100, crush: 0.7, breath: 0.12, wobble: 0.3, vol: 0.26, reverb: 0.55 },
-  hades:    { wave: 'square', f0: 78, syl: 0.18, range: 2, cut: 1300, crush: 0.5, breath: 0.04, wobble: 0.08, vol: 0.24, reverb: 0.7 },
-  eurydice: { wave: 'triangle', f0: 300, syl: 0.15, range: 4, cut: 3600, crush: 0.1, breath: 0.45, wobble: 0.15, vol: 0.2, reverb: 0.8 },
-  shade:    { wave: 'sawtooth', f0: 120, syl: 0.2, range: 7, cut: 1700, crush: 0.85, breath: 0.35, wobble: 1.8, vol: 0.24, reverb: 0.7 },
-  soul:     { wave: 'triangle', f0: 200, syl: 0.16, range: 3, cut: 3000, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, reverb: 0.8 },
+  // Ο αφηγητής: ζεστός, ήρεμος (αντρική φωνή).
+  narrator: { wave: 'pulse', f0: 150, syl: 0.13, range: 3, cut: 2600, crush: 0.25, breath: 0.05, wobble: 0.1, vol: 0.2, reverb: 0.35, fmt: 1 },
+  // Ο Ορφέας: νέος άντρας, τραγουδιστής — ζεστή, μελωδική φωνή.
+  orpheus:  { wave: 'sawtooth', f0: 132, syl: 0.14, range: 5, cut: 2300, crush: 0.2, breath: 0.08, wobble: 0.12, vol: 0.19, reverb: 0.45, fmt: 0.95 },
+  charon:   { wave: 'sawtooth', f0: 62, syl: 0.2, range: 2, cut: 1100, crush: 0.7, breath: 0.12, wobble: 0.3, vol: 0.26, reverb: 0.55, fmt: 0.82 },
+  hades:    { wave: 'square', f0: 78, syl: 0.18, range: 2, cut: 1300, crush: 0.5, breath: 0.04, wobble: 0.08, vol: 0.24, reverb: 0.7, fmt: 0.85 },
+  // Η Ευρυδίκη: γυναίκα — ψηλή, απαλή, με ανάσα.
+  eurydice: { wave: 'triangle', f0: 300, syl: 0.15, range: 4, cut: 3600, crush: 0.1, breath: 0.45, wobble: 0.15, vol: 0.2, reverb: 0.8, fmt: 1.2 },
+  // Σκιές: παραμορφωμένο βογκητό, αντρικό ή γυναικείο.
+  shade:    { wave: 'sawtooth', f0: 110, syl: 0.2, range: 7, cut: 1700, crush: 0.85, breath: 0.35, wobble: 1.8, vol: 0.24, reverb: 0.7, fmt: 0.88 },
+  shadeF:   { wave: 'sawtooth', f0: 215, syl: 0.19, range: 7, cut: 2600, crush: 0.8, breath: 0.4, wobble: 1.9, vol: 0.22, reverb: 0.7, fmt: 1.18 },
+  // Χαμένες ψυχές: ψίθυροι — άντρας, γέρος, γυναίκα.
+  soulM:    { wave: 'triangle', f0: 118, syl: 0.16, range: 3, cut: 2500, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, hum: 0.14, reverb: 0.8, fmt: 0.88 },
+  soulOld:  { wave: 'triangle', f0: 92, syl: 0.19, range: 2, cut: 2100, crush: 0, breath: 1, wobble: 0.5, vol: 0.2, whisper: true, hum: 0.12, reverb: 0.8, fmt: 0.82 },
+  soulF:    { wave: 'triangle', f0: 225, syl: 0.15, range: 4, cut: 3800, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, hum: 0.14, reverb: 0.8, fmt: 1.2 },
 };
 
 // Formants (F1, F2) για κάθε φωνήεν — δίνουν στη φωνή το "α", "ε", "ι", "ο", "ου".
@@ -149,7 +161,7 @@ const Voice = {
       semi -= (i / Math.max(1, syl.length)) * 1.5;
       const f = v.f0 * Math.pow(2, semi / 12);
       const len = v.syl * (s.fall || s.rise ? 1.5 : 1) * (0.85 + (s.hash % 5) * 0.06);
-      const [f1, f2] = FORMANTS[s.vowel] || FORMANTS.a;
+      const [f1, f2] = (FORMANTS[s.vowel] || FORMANTS.a).map((f) => f * (v.fmt || 1));
 
       // Formants αυτής της συλλαβής.
       const env = ac.createGain();
@@ -194,6 +206,20 @@ const Voice = {
         body.gain.value = 0.25;
         o.connect(body);
         body.connect(env);
+        o.start(t);
+        o.stop(t + len + 0.05);
+        keep({ src: o });
+      } else if (v.hum) {
+        // Ψίθυρος με λίγη "φωνή" από κάτω: ακούγεται αν είναι άντρας ή γυναίκα.
+        const o = ac.createOscillator();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f, t);
+        if (s.fall) o.frequency.linearRampToValueAtTime(f * 0.85, t + len);
+        const hg = ac.createGain();
+        hg.gain.value = v.hum;
+        o.connect(hg);
+        hg.connect(b1);
+        hg.connect(env);
         o.start(t);
         o.stop(t + len + 0.05);
         keep({ src: o });

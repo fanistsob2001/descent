@@ -28,6 +28,7 @@ const Level = {
   souls: [],           // { n, x, y } — μηνύματα χαμένων ψυχών (1..6)
   eggs: {},            // easter eggs: { stuck: { x, y }, cerberus: { x, y } }
   quiet: null,         // Uint8Array: κελιά όπου οι σκιές δεν πάνε ποτέ να περιπλανηθούν
+  seen: null,          // Uint8Array: κελιά που έχει ήδη "δει" ο παίκτης (φωτίστηκαν από κύμα ή πέρασε από εκεί) — για τον χάρτη
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
 
   // Κομμάτια τοίχων (segments) που μπορούν να φωτιστούν.
@@ -59,6 +60,7 @@ const Level = {
     this.opaque = new Uint8Array(this.cols * this.rows).fill(1);
     this.terrain = new Uint8Array(this.cols * this.rows).fill(T_WALL);
     this.region = new Int8Array(this.cols * this.rows).fill(-1);
+    this.seen = new Uint8Array(this.cols * this.rows);
     this.monsters = [];
     this.altars = [];
     this.items = [];
@@ -127,6 +129,25 @@ const Level = {
     this.opaque[g.ty * this.cols + g.tx] = open ? 0 : 1;
     for (let k = 0; k < this.segCount; k++) {
       if (this.segGate[k] === i) this.segFade[k] = open ? 0 : this.segBaseFade[k];
+    }
+  },
+
+  // Τα κελιά που έχει δει ο παίκτης, για το save: bitset σε δεκαεξαδική μορφή.
+  seenString() {
+    let out = '';
+    for (let i = 0; i < this.seen.length; i += 4) {
+      out += ((this.seen[i] ? 1 : 0) | (this.seen[i + 1] ? 2 : 0) |
+        (this.seen[i + 2] ? 4 : 0) | (this.seen[i + 3] ? 8 : 0)).toString(16);
+    }
+    return out;
+  },
+
+  // Προσθέτει (δεν σβήνει) όσα κελιά λέει ένα seenString.
+  mergeSeen(str) {
+    if (typeof str !== 'string') return;
+    for (let k = 0; k < str.length && k * 4 < this.seen.length; k++) {
+      const v = parseInt(str[k], 16) || 0;
+      for (let b = 0; b < 4; b++) if (v & (1 << b)) this.seen[k * 4 + b] = 1;
     }
   },
 

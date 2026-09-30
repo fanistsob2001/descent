@@ -57,7 +57,8 @@ const Eggs = {
           this.revealTime = Echoes.now;
           if (Echoes.now - this.barkStart < CERB_COOLDOWN) return;
           this.barkStart = Echoes.now;
-          Notice.show(STORY.cerberus, Echoes.now, 5);
+          const said = Voice.say(STORY.cerberus, 'orpheus', { delay: CERB_BARK_GAP * 3 + 0.2 });
+          Notice.show(STORY.cerberus, Echoes.now, Math.max(5, said + CERB_BARK_GAP * 3 + 0.6));
           // Τρία γαβγίσματα, ένα από κάθε κεφάλι: χαμηλό, μεσαίο, ψηλό.
           CERB_PITCH.forEach((f, i) => Sound.bark(this.x, this.y, f, i * CERB_BARK_GAP));
         },

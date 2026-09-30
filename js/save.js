@@ -4,13 +4,14 @@
 // (π.χ. ιδιωτική περιήγηση), το παιχνίδι δουλεύει κανονικά χωρίς αποθήκευση.
 
 // Μία μόνο θέση αποθήκευσης: η κατάσταση τη στιγμή που άναψε ο τελευταίος βωμός.
-// { chapter: 0..4, jars, strings, obol, paid, melody, taken: [id αντικειμένων] }
+// { chapter: 0..4, jars, strings, obol, paid, melody, taken: [id αντικειμένων],
+//   seen: τα κελιά που έχει δει ο παίκτης (Level.seenString) }
 const Save = {
   KEY: 'descent-save',
 
   // Η κατάσταση ενός καινούργιου παιχνιδιού (chapter -1 = πριν τον πρώτο βωμό).
   fresh() {
-    return { chapter: -1, jars: 0, strings: 0, obol: false, paid: false, melody: 0, taken: [] };
+    return { chapter: -1, jars: 0, strings: 0, obol: false, paid: false, melody: 0, taken: [], seen: '' };
   },
 
   load() {
@@ -26,6 +27,7 @@ const Save = {
           paid: d.paid === true,
           melody: int(d.melody),
           taken: Array.isArray(d.taken) ? d.taken.filter(Number.isInteger) : [],
+          seen: typeof d.seen === 'string' && /^[0-9a-f]*$/.test(d.seen) ? d.seen : '',
         };
       }
     } catch (_) { /* χωρίς αποθήκευση */ }
