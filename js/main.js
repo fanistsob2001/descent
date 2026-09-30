@@ -32,7 +32,7 @@ const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, cutscene: 0.35, e
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
-const ctx = canvas.getContext('2d', { alpha: false });
+let ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
   menu: $('menu'), settings: $('settings'), pause: $('pause'),
   endGood: $('end-good'), endBad: $('end-bad'),
@@ -76,6 +76,7 @@ function resize() {
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
   scale = Math.min(cssW / VIEW_MIN_W, cssH / VIEW_MIN_H);
+  Pixel.resize(cssW, cssH);
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
@@ -249,67 +250,93 @@ function checkCharon() {
 }
 
 // ---- Σχεδίαση ----
+// Όλα ζωγραφίζονται σε pixel art στον μικρό καμβά (js/pixel.js) και μετά μεγαλώνουν.
+// Μόνο ό,τι πρέπει να διαβάζεται (τα λόγια των ψυχών) και το joystick ζωγραφίζονται
+// σε πλήρη ανάλυση από πάνω.
+let pxScale = 1;   // art pixels ανά μονάδα κόσμου
+
 function draw() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  const pc = Pixel.begin();
+  const W = Pixel.w, H = Pixel.h;
+
   if (state === 'menu') {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    Fx.drawMenu(ctx, cssW, cssH, performance.now() / 1000);
+    Fx.drawMenu(pc, W, H, performance.now() / 1000);
+    Pixel.present(ctx, dpr);
     return;
   }
   if (state === 'cutscene') return;
 
-  // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο.
+  // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο, και η οθόνη τινάζεται.
   if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    Scare.draw(ctx, cssW, cssH, gameTime - endTime);
+    Scare.draw(pc, W, H, gameTime - endTime);
+    const k = 1 - (gameTime - endTime) / SCARE_TIME;
+    Pixel.present(ctx, dpr, (Math.random() - 0.5) * 6 * k, (Math.random() - 0.5) * 6 * k);
     return;
   }
 
-  const halfW = cssW / 2 / scale, halfH = cssH / 2 / scale;
+  pxScale = scale / Pixel.px;
+  const halfW = W / 2 / pxScale, halfH = H / 2 / pxScale;
   const view = {
     x0: camera.x - halfW, x1: camera.x + halfW,
     y0: camera.y - halfH, y1: camera.y + halfH,
   };
 
-  const [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
-  const s = scale * dpr;
-  ctx.setTransform(s, 0, 0, s,
-    (cssW / 2 - camera.x * scale + shakeX) * dpr,
-    (cssH / 2 - camera.y * scale + shakeY) * dpr);
+  // Τρέμουλο: από τον τρόμο όσο παίζεις, και ένα τίναγμα που σβήνει μετά τον θάνατο.
+  let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
+  if (state === 'dead') {
+    const k = Math.max(0, 1 - (gameTime - endTime - SCARE_TIME) / (DEATH_DELAY - SCARE_TIME));
+    shakeX = (Math.random() - 0.5) * 10 * k;
+    shakeY = (Math.random() - 0.5) * 10 * k;
+  }
+  // Η κάμερα "κουμπώνει" σε ακέραια art pixels, ώστε τα pixels να μη "κολυμπάνε".
+  const camX = Math.round(W / 2 - camera.x * pxScale);
+  const camY = Math.round(H / 2 - camera.y * pxScale);
+  pc.setTransform(pxScale, 0, 0, pxScale, camX, camY);
 
+  const saved = ctx;
+  ctx = pc;   // οι βοηθητικές συναρτήσεις (drawPlayer κ.λπ.) ζωγραφίζουν στο ctx
   if (showMap) drawDebugMap();
 
-  Echoes.draw(ctx, gameTime, view, scale);
-  Altars.draw(ctx, gameTime, view);
-  ExitDoor.draw(ctx, gameTime);
-  Items.draw(ctx, gameTime, view);
-  Souls.draw(ctx, gameTime, view);
-  Eggs.draw(ctx, gameTime, view);
-  Charon.draw(ctx, gameTime);
-  Jars.draw(ctx, gameTime);
-  Melody.draw(ctx, gameTime);
-  Fx.drawMotes(ctx, gameTime);
+  Echoes.draw(pc, gameTime, view, pxScale);
+  Altars.draw(pc, gameTime, view);
+  ExitDoor.draw(pc, gameTime);
+  Items.draw(pc, gameTime, view);
+  Eggs.draw(pc, gameTime, view);
+  Charon.draw(pc, gameTime);
+  Jars.draw(pc, gameTime);
+  Melody.draw(pc, gameTime);
+  Fx.drawMotes(pc, gameTime);
 
   for (const m of monsters) {
     if (state === 'dead' && m === killer) {
       // Το τέρας φαίνεται ολόκληρο εκεί που σε έπιασε.
-      m.draw(ctx, gameTime, Math.max(0.25, 1 - deathFade() * 0.6));
+      m.draw(pc, gameTime, Math.max(0.25, 1 - deathFade() * 0.6));
     } else {
-      m.draw(ctx, gameTime);
+      m.draw(pc, gameTime);
     }
   }
   drawPlayer();
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (state === 'play' || state === 'paused') Dread.drawVignette(ctx, cssW, cssH, gameTime);
+  pc.setTransform(1, 0, 0, 1, 0, 0);
+  if (state === 'play' || state === 'paused') Dread.drawVignette(pc, W, H, gameTime);
   // Λεπτός μαίανδρος πάνω και κάτω, σαν το στεφάνι ενός αγγείου.
-  Pottery.meander(ctx, 0, 1, cssW, 10, POT.terra, 0.28, 1);
-  Pottery.meander(ctx, 0, cssH - 11, cssW, 10, POT.terra, 0.28, 1);
+  Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
+  Pottery.meander(pc, 0, H - 7, W, 7, POT.terra, 0.35, 1);
+  if (state === 'dead') drawDeathFlash(W, H);
+  ctx = saved;
+
+  Pixel.present(ctx, dpr, shakeX, shakeY);
+
+  // Από πάνω, σε πλήρη ανάλυση: τα λόγια των ψυχών (για να διαβάζονται) και το joystick.
+  const k = Pixel.px * dpr;
+  ctx.setTransform(pxScale * k, 0, 0, pxScale * k, (camX + shakeX) * k, (camY + shakeY) * k);
+  Souls.draw(ctx, gameTime, view);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (state === 'play') drawJoystick();
-  if (state === 'dead') drawDeathFlash();
 }
 
 function drawPlayer() {
@@ -324,10 +351,10 @@ function drawPlayer() {
     // Όσο σέρνεις το δάχτυλο για ακύρωση, το δαχτυλίδι ξεθωριάζει και γίνεται διακεκομμένο.
     const drag = Input.chargeDrag;
     const fadeDrag = 1 - drag * 0.75;
-    if (drag > 0.2) ctx.setLineDash([3, 3]);
+    if (drag > 0.2) ctx.setLineDash([2 / pxScale, 2 / pxScale]);
     // Κανονικά στο χρώμα του πηλού· κόκκινο (έντονο, παλλόμενο) όταν στο V θα σήμαινε "κοιτάζω πίσω".
     const color = warn ? '255,40,30' : POT.light;
-    ctx.lineWidth = (warn ? 2.6 + 1.2 * pulse : 1.5) / scale;
+    ctx.lineWidth = (warn ? 2 + 1 * pulse : 1) / pxScale;
     ctx.strokeStyle = `rgba(${color},${(((warn ? 0.6 : 0.2) + 0.35 * c * pulse) * fadeDrag).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(player.x, player.y, rr, 0, Math.PI * 2);
@@ -348,8 +375,8 @@ function drawPlayer() {
     } else if (rule) {
       // Στο V: μια αχνή γραμμή δείχνει ως πού μπορείς να φορτίσεις χωρίς να κοιτάξεις πίσω.
       ctx.strokeStyle = `rgba(255,60,40,${(0.35 * fadeDrag).toFixed(3)})`;
-      ctx.lineWidth = 1 / scale;
-      ctx.setLineDash([2, 4]);
+      ctx.lineWidth = 1 / pxScale;
+      ctx.setLineDash([2 / pxScale, 3 / pxScale]);
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.r + 4 + LOOK_BACK_CHARGE * 16, 0, Math.PI * 2);
       ctx.stroke();
@@ -361,7 +388,7 @@ function drawPlayer() {
   const ct = (gameTime - cancelFx.t) / 0.35;
   if (ct >= 0 && ct < 1) {
     ctx.strokeStyle = `rgba(${POT.light},${(0.5 * (1 - ct)).toFixed(3)})`;
-    ctx.lineWidth = 1.2 / scale;
+    ctx.lineWidth = 1 / pxScale;
     ctx.beginPath();
     ctx.arc(player.x, player.y, Math.max(1, cancelFx.r * (1 - ct)), 0, Math.PI * 2);
     ctx.stroke();
@@ -381,7 +408,7 @@ function drawPlayer() {
 
   // Ο Ορφέας ως μορφή αγγείου που περπατάει. Η λύρα φαίνεται στα χέρια του
   // όταν ξαναγίνει ολόκληρη.
-  const h = player.r * 4.2;
+  const h = player.r * 5;   // ~15 art pixels ύψος: διαβάζεται καθαρά
   Pottery.orpheus(ctx, player.x, player.y + h * 0.5, h, 0.88 + 0.12 * c, strings >= 3, player.dir,
     { phase: player.walkPhase, speed: player.walkSpeed, t: gameTime });
 }
@@ -416,15 +443,15 @@ function deathFade() {
   return Math.max(0, Math.min(1, (gameTime - endTime - SCARE_TIME) / (DEATH_DELAY - SCARE_TIME)));
 }
 
-function drawDeathFlash() {
+function drawDeathFlash(w = cssW, h = cssH) {
   const t = deathFade();
   const a = 0.55 * (1 - t) + 0.2;
-  const g = ctx.createRadialGradient(cssW / 2, cssH / 2, Math.min(cssW, cssH) * 0.15,
-    cssW / 2, cssH / 2, Math.max(cssW, cssH) * 0.75);
+  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.15,
+    w / 2, h / 2, Math.max(w, h) * 0.75);
   g.addColorStop(0, 'rgba(120,0,0,0)');
   g.addColorStop(1, `rgba(120,0,0,${a.toFixed(3)})`);
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, cssW, cssH);
+  ctx.fillRect(0, 0, w, h);
 }
 
 function drawDebugMap() {
@@ -835,6 +862,7 @@ function init() {
   document.addEventListener('dblclick', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  Pixel.init();
   resize();
   showScreen('menu');
   requestAnimationFrame(frame);

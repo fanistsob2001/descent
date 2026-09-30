@@ -49,7 +49,7 @@ const Fx = {
       if (l < 0.03) continue;
       const tw = 0.6 + 0.4 * Math.sin(now * 3 + m.ph * 4);
       ctx.fillStyle = `rgba(${POT.light},${Math.min(0.85, l * 0.9 * tw).toFixed(3)})`;
-      ctx.fillRect(m.x, m.y, m.sz, m.sz);
+      ctx.fillRect(m.x, m.y, m.sz * 1.8, m.sz * 1.8);   // ~1 art pixel
     }
     ctx.restore();
   },

@@ -39,6 +39,7 @@ const Level = {
   segFade: null,       // σε πόσα δευτ. σβήνει κάθε κομμάτι (Λήθη = πιο γρήγορα), 0 = ανενεργό
   segBaseFade: null,
   segGate: null,       // Int16Array: σε ποια πύλη ανήκει το κομμάτι (-1 = σε καμία)
+  regionFade: [],      // σε πόσα δευτ. σβήνει το φως σε κάθε κεφάλαιο (για το δάπεδο)
 
   // Ενώνει τα κεφάλαια σε έναν χάρτη: το ένα κάτω από το άλλο, μετατοπισμένα
   // οριζόντια ώστε το v κάθε κεφαλαίου να πέφτει ακριβώς πάνω από το ^ του επόμενου.
@@ -114,6 +115,7 @@ const Level = {
       this.segBaseFade[i] = r >= 0 ? chapters[r].fade : 1.5;
     }
     this.segFade = this.segBaseFade.slice();
+    this.regionFade = chapters.map((c) => c.fade);
     this.gates.forEach((g, i) => this.setGate(i, false));
   },
 

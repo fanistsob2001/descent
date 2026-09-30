@@ -526,3 +526,35 @@ body {
   color: #e0503c;
   text-shadow: 0 0 10px rgba(150, 20, 10, 0.9);
 }
+
+/* Pixel art: οι μικροί καμβάδες μεγαλώνουν με καθαρά τετράγωνα pixels. */
+#cut-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Κουμπιά σε ύφος 8-bit: τετράγωνες γωνίες, χοντρό περίγραμμα, "σκιά" χωρίς θάμπωμα. */
+.btn {
+  border-radius: 0;
+  border-width: 2px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.9), 4px 4px 0 1px rgba(206, 108, 56, 0.35);
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.9);
+}
+
+.hud-btn {
+  border-radius: 0;
+  border-width: 2px;
+}
+
+.hud-btn .count {
+  border-radius: 0;
+}
+
+#level-buttons button,
+#cut-skip {
+  border-radius: 0;
+}

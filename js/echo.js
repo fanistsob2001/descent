@@ -22,6 +22,10 @@ const Echoes = {
     this.waves = [];
     this.litTime = new Float32Array(n).fill(-1e6);
     this.litStrength = new Float32Array(n);
+    // Το ίδιο για τα κελιά του δαπέδου (και του νερού): φωτίζονται όταν τα βρει το δαχτυλίδι.
+    const cells = Level.cols * Level.rows;
+    this.cellTime = new Float32Array(cells).fill(-1e6);
+    this.cellStr = new Float32Array(cells);
     this._buckets = [];
     for (let b = 0; b < ALPHA_BUCKETS; b++) this._buckets.push([]);
   },
@@ -41,13 +45,30 @@ const Echoes = {
     }
     hits.sort((a, b) => a.d - b.d);
 
+    // Κελιά δαπέδου/νερού μέσα στην ακτίνα, που ο ήχος τα φτάνει χωρίς τοίχο στη μέση.
+    const cellHits = [];
+    const tx0 = Math.max(0, Math.floor((x - radius) / TILE)), tx1 = Math.min(L.cols - 1, Math.floor((x + radius) / TILE));
+    const ty0 = Math.max(0, Math.floor((y - radius) / TILE)), ty1 = Math.min(L.rows - 1, Math.floor((y + radius) / TILE));
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const t = L.terrain[ty * L.cols + tx];
+        if (t === T_WALL || t === T_CHASM) continue;
+        const cx = (tx + 0.5) * TILE, cy = (ty + 0.5) * TILE;
+        const d = Math.hypot(cx - x, cy - y);
+        if (d > radius) continue;
+        if (!L.lineOfSight(x, y, cx, cy)) continue;
+        cellHits.push({ c: ty * L.cols + tx, d });
+      }
+    }
+    cellHits.sort((a, b) => a.d - b.d);
+
     // Ακτίνες ορατότητας: μέχρι πού φτάνει ο ήχος προς κάθε κατεύθυνση πριν βρει τοίχο.
     // Το δαχτυλίδι και η λάμψη του ακολουθούν τους διαδρόμους αντί να περνάνε μέσα από τοίχους.
     const n = radius > 200 ? 128 : 48;
     const rays = new Float32Array(n);
     for (let k = 0; k < n; k++) rays[k] = L.castRay(x, y, (k / n) * Math.PI * 2, radius);
 
-    const wave = { x, y, radius, strength, kind, r: 0, hits, ptr: 0, reached: new Set(), rays };
+    const wave = { x, y, radius, strength, kind, r: 0, hits, ptr: 0, reached: new Set(), rays, cells: cellHits, cptr: 0 };
     this.waves.push(wave);
     return wave;
   },
@@ -73,6 +94,18 @@ const Echoes = {
         if (s > current) {
           this.litTime[h.i] = now;
           this.litStrength[h.i] = s;
+        }
+      }
+
+      while (wave.cptr < wave.cells.length && wave.cells[wave.cptr].d <= wave.r) {
+        const h = wave.cells[wave.cptr++];
+        const s = this.strengthAt(wave, h.d);
+        const fade = Level.regionFade[Level.region[h.c]] || 1.5;
+        const age = now - this.cellTime[h.c];
+        const current = age < fade ? this.cellStr[h.c] * (1 - age / fade) : 0;
+        if (s > current) {
+          this.cellTime[h.c] = now;
+          this.cellStr[h.c] = s;
         }
       }
 
@@ -154,6 +187,8 @@ const Echoes = {
       buckets[b].push(i);
     }
 
+    this._drawFloor(ctx, now, view);
+
     // 1) Λάμψη των κυμάτων στο δάπεδο (πίσω από όλα): ο διάδρομος φωτίζεται για
     // λίγο μέσα στην ορατότητα του ήχου και σβήνει καθώς φεύγει το δαχτυλίδι.
     ctx.globalCompositeOperation = 'lighter';
@@ -219,6 +254,67 @@ const Echoes = {
     ctx.globalCompositeOperation = 'lighter';
     for (const w of this.waves) this._drawRing(ctx, w, scale);
     ctx.globalCompositeOperation = 'source-over';
+  },
+
+  // Το δάπεδο που φώτισε ο ήχος: σκούρα πήλινα πλακάκια (2×2 σε κάθε κελί, με αρμούς
+  // ανάμεσα και λίγες ρωγμές), και νερό με κυματάκια που κινούνται. Σβήνουν όπως οι τοίχοι.
+  _drawFloor(ctx, now, view) {
+    const L = Level;
+    const tx0 = Math.max(0, Math.floor(view.x0 / TILE) - 1), tx1 = Math.min(L.cols - 1, Math.floor(view.x1 / TILE) + 1);
+    const ty0 = Math.max(0, Math.floor(view.y0 / TILE) - 1), ty1 = Math.min(L.rows - 1, Math.floor(view.y1 / TILE) + 1);
+    const half = TILE / 2, gap = 4.5;   // αρμός ~2 art pixels
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const c = ty * L.cols + tx;
+        const age = now - this.cellTime[c];
+        const fade = L.regionFade[L.region[c]] || 1.5;
+        if (age >= fade) continue;
+        const f = 1 - age / fade;
+        const a = this.cellStr[c] * f * Math.sqrt(f);
+        if (a < 0.02) continue;
+        const x = tx * TILE, y = ty * TILE;
+        if (L.terrain[c] === T_WATER) {
+          ctx.fillStyle = `rgba(20,12,10,${(a * 0.85).toFixed(3)})`;
+          ctx.fillRect(x, y, TILE, TILE);
+          // Κυματάκια: δύο γραμμές που κυλάνε αργά (σκούρο νερό του Κάτω Κόσμου).
+          ctx.strokeStyle = `rgba(${POT.terra},${(a * 0.45).toFixed(3)})`;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          for (const k of [0.3, 0.75]) {
+            const yy = y + TILE * k;
+            const ph = now * 1.3 + tx * 1.7 + k * 5;
+            ctx.moveTo(x + 4, yy + Math.sin(ph) * 2.5);
+            ctx.lineTo(x + TILE * 0.5, yy + Math.sin(ph + 1.6) * 2.5);
+            ctx.lineTo(x + TILE - 4, yy + Math.sin(ph + 3.2) * 2.5);
+          }
+          ctx.stroke();
+          continue;
+        }
+        // Πήλινα πλακάκια με μικρές διαφορές χρώματος (σταθερές ανά πλακάκι).
+        for (let k = 0; k < 4; k++) {
+          const sx = x + (k & 1) * half, sy = y + (k >> 1) * half;
+          const h = Math.abs(Math.sin((tx * 2 + (k & 1)) * 12.9898 + (ty * 2 + (k >> 1)) * 78.233) * 43758.5453) % 1;
+          const r = 62 + Math.round(h * 22), g = 30 + Math.round(h * 10), b = 18 + Math.round(h * 6);
+          ctx.fillStyle = `rgba(${r},${g},${b},${(a * 0.55).toFixed(3)})`;
+          ctx.fillRect(sx + gap / 2, sy + gap / 2, half - gap, half - gap);
+          if (h > 0.86) {
+            // Ρωγμή σε λίγα πλακάκια.
+            ctx.strokeStyle = `rgba(12,6,4,${(a * 0.8).toFixed(3)})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(sx + 4, sy + 5);
+            ctx.lineTo(sx + half * 0.5, sy + half * 0.45);
+            ctx.lineTo(sx + half - 5, sy + half - 6);
+            ctx.stroke();
+          }
+        }
+        // Γκρεμός: αν από κάτω είναι χάσμα, μια σκούρα ακμή δείχνει το βάθος.
+        if (L.terrainAt(tx, ty + 1) === T_CHASM) {
+          ctx.fillStyle = `rgba(${POT.terra},${(a * 0.5).toFixed(3)})`;
+          ctx.fillRect(x, y + TILE - 3, TILE, 3);
+        }
+      }
+    }
   },
 
   // Η "λάμψη" ενός κύματος: το πολύγωνο ορατότητας, γεμάτο με απαλή ακτινική διαβάθμιση.

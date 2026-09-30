@@ -46,11 +46,13 @@ const Cutscene = {
   // Μια σκηνή σαν ζωφόρος αγγείου: μορφές σε σιλουέτα πάνω από έναν μαίανδρο.
   drawArt(art) {
     const cv = document.getElementById('cut-art');
-    const w = 300, h = 118, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    cv.width = w * dpr;
-    cv.height = h * dpr;
+    // Pixel art: ζωγραφίζεται σε μισή ανάλυση και το CSS τη μεγαλώνει με καθαρά
+    // τετράγωνα pixels (image-rendering: pixelated).
+    const w = 300, h = 118, k = 0.5;
+    cv.width = w * k;
+    cv.height = h * k;
     const c = cv.getContext('2d');
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.setTransform(k, 0, 0, k, 0, 0);
     c.clearRect(0, 0, w, h);
     const ground = h - 18, s = 84;
     if (art === 'intro') {
