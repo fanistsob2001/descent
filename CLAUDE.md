@@ -380,8 +380,8 @@
 
 ## Δοκιμή
 - PC: διπλό κλικ στο `index.html`.
-- Κινητό: https://fanistsob2001.github.io/silent-escape/ (GitHub Pages από το
-  `main`, repo `fanistsob2001/silent-escape`). Κάθε `git push` στο `main`
+- Κινητό: https://fanistsob2001.github.io/descent/ (GitHub Pages από το
+  `main`, repo `fanistsob2001/descent`, μέχρι 30/9/2026 λεγόταν `silent-escape`). Κάθε `git push` στο `main`
   ενημερώνει τη σελίδα σε ~1 λεπτό.
 - Αυτόματες δοκιμές στο browser pane: αν το pane είναι κρυφό, το
   `requestAnimationFrame` σταματάει — προχώρα το παιχνίδι καλώντας `frame(t)`
