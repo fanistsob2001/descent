@@ -28,7 +28,7 @@ const MELODY_HINTS = [
 ];
 
 // Ένταση του ambient βουητού ανά κατάσταση.
-const AMBIENT = { play: 1, paused: 0.4, menu: 0.6, dead: 0.25, cutscene: 0.35, end: 0.5 };
+const AMBIENT = { play: 1, paused: 0.4, map: 0.4, menu: 0.6, dead: 0.25, cutscene: 0.35, end: 0.5 };
 
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
@@ -36,7 +36,7 @@ const canvas = $('game');
 let ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
   menu: $('menu'), settings: $('settings'), pause: $('pause'),
-  endGood: $('end-good'), endBad: $('end-bad'),
+  endGood: $('end-good'), endBad: $('end-bad'), map: $('map-screen'),
 };
 const hudEl = $('hud');
 const jarBtn = $('btn-jar');
@@ -44,7 +44,7 @@ const melodyBtn = $('btn-melody');
 
 // ---- Κατάσταση ----
 let cssW = 0, cssH = 0, dpr = 1, scale = 1;
-// 'menu' | 'play' | 'paused' | 'dead' | 'end'
+// 'menu' | 'play' | 'paused' | 'map' | 'dead' | 'end'
 let state = 'menu';
 let chapter = -1;        // ο τελευταίος βωμός που άναψε (-1 = κανένας ακόμα)
 let strings = 0;         // χορδές της λύρας (0..3)
@@ -56,7 +56,7 @@ let lastFrame = 0;
 let endTime = 0;         // πότε πέθανε
 let monsters = [];
 let killer = null;       // η σκιά που έπιασε τον παίκτη
-let showMap = false;     // βοήθεια για δοκιμές: πλήκτρο M
+let showMap = false;     // βοήθεια για δοκιμές (από την κονσόλα): σκιές, έξοδος, τοίχοι
 
 // fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το αγγείο.
 const player = {
@@ -271,11 +271,16 @@ function draw() {
   const W = Pixel.w, H = Pixel.h;
 
   if (state === 'menu') {
-    Fx.drawMenu(pc, W, H, performance.now() / 1000);
+    Fx.drawMenu(pc, W, H, performance.now() / 1000, menuArtBox(W, H));
     Pixel.present(ctx, dpr);
     return;
   }
   if (state === 'cutscene') return;
+  if (state === 'map') {
+    drawMap(pc, W, H);
+    Pixel.present(ctx, dpr);
+    return;
+  }
 
   // Jump scare: το πρόσωπο καλύπτει τα πάντα για λίγο, και η οθόνη τινάζεται.
   if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
@@ -346,6 +351,16 @@ function draw() {
   Souls.draw(ctx, gameTime, view);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (state === 'play') drawJoystick();
+}
+
+// Πού μπαίνει η σκηνή του μενού (σε art pixels): στον χώρο #menu-art, πάνω από τον τίτλο.
+// Σε οριζόντια οθόνη το #menu-art κρύβεται (το μενού πάει δεξιά) και η σκηνή μπαίνει αριστερά.
+// null = το μενού δεν φαίνεται (π.χ. Settings): καμία σκηνή.
+function menuArtBox(W, H) {
+  if (screens.menu.classList.contains('hidden')) return null;
+  const r = $('menu-art').getBoundingClientRect();
+  if (r.width > 0) return { x: r.left / Pixel.px, y: r.top / Pixel.px, w: r.width / Pixel.px, h: r.height / Pixel.px };
+  return { x: W * 0.03, y: H * 0.2, w: W * 0.38, h: H * 0.6 };
 }
 
 function drawPlayer() {
@@ -499,6 +514,114 @@ function drawDeathFlash(w = cssW, h = cssH) {
   g.addColorStop(1, `rgba(120,0,0,${a.toFixed(3)})`);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+}
+
+// ---- Χάρτης του παίκτη ----
+// Δείχνει ΜΟΝΟ τη μορφή του χώρου (δάπεδο, νερό, χάσματα, τοίχοι) των κεφαλαίων που έχεις
+// φτάσει, και πού είσαι — όχι σκιές, αντικείμενα, ψυχές ή την έξοδο. Το παιχνίδι σταματάει
+// όσο είναι ανοιχτός. Ζωγραφίζεται σε pixel art: κάθε κελί = λίγα art pixels.
+let mapBounds = null;   // για κάθε κεφάλαιο: { x0, x1, y0, y1 } σε κελιά
+
+function regionBounds() {
+  const b = CHAPTERS.map(() => ({ x0: Infinity, x1: -1, y0: Infinity, y1: -1 }));
+  for (let ty = 0; ty < Level.rows; ty++) {
+    for (let tx = 0; tx < Level.cols; tx++) {
+      const r = Level.region[ty * Level.cols + tx];
+      if (r < 0 || Level.terrain[ty * Level.cols + tx] === T_WALL) continue;
+      const q = b[r];
+      q.x0 = Math.min(q.x0, tx); q.x1 = Math.max(q.x1, tx);
+      q.y0 = Math.min(q.y0, ty); q.y1 = Math.max(q.y1, ty);
+    }
+  }
+  return b;
+}
+
+function drawMap(pc, W, H) {
+  if (!mapBounds) mapBounds = regionBounds();
+  const here = Math.max(0, playerRegion());
+  const reached = Math.max(chapter, here);
+  const cur = mapBounds[here];
+  // Μέγεθος κελιού: να χωράει ολόκληρο το τωρινό κεφάλαιο (με χώρο για τίτλο και κουμπί).
+  const cell = Math.max(2, Math.min(8, Math.floor(Math.min(
+    (W - 12) / (cur.x1 - cur.x0 + 1), (H - 70) / (cur.y1 - cur.y0 + 1)))));
+  // Κεντραρισμένο στο τωρινό κεφάλαιο.
+  const ox = Math.round(W / 2 - ((cur.x0 + cur.x1 + 1) / 2) * cell);
+  const oy = Math.round(H / 2 + 4 - ((cur.y0 + cur.y1 + 1) / 2) * cell);
+  const L = Level;
+  const shown = (tx, ty) => {
+    const r = L.regionAt(tx, ty);
+    return r >= 0 && r <= reached;
+  };
+  const ty0 = Math.max(0, Math.floor(-oy / cell)), ty1 = Math.min(L.rows - 1, Math.ceil((H - oy) / cell));
+  const tx0 = Math.max(0, Math.floor(-ox / cell)), tx1 = Math.min(L.cols - 1, Math.ceil((W - ox) / cell));
+
+  // Δάπεδο (σκούρος πηλός), νερό (με κυματάκια), χάσματα (μαύρα, με αχνές κουκκίδες).
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (!shown(tx, ty)) continue;
+      const t = L.terrain[ty * L.cols + tx];
+      if (t === T_WALL) continue;
+      const x = ox + tx * cell, y = oy + ty * cell;
+      // Τα προηγούμενα κεφάλαια πιο σβηστά από το τωρινό.
+      const dim = L.regionAt(tx, ty) === here ? 1 : 0.55;
+      if (t === T_FLOOR) {
+        pc.fillStyle = `rgba(92,48,28,${dim})`;
+        pc.fillRect(x, y, cell, cell);
+      } else if (t === T_WATER) {
+        pc.fillStyle = `rgba(40,26,20,${dim})`;
+        pc.fillRect(x, y, cell, cell);
+        pc.fillStyle = `rgba(${POT.terra},${0.5 * dim})`;
+        if ((tx + ty) % 2 === 0) pc.fillRect(x + 1, y + Math.floor(cell / 2), Math.max(1, cell - 2), 1);
+      } else if (t === T_CHASM && (tx + ty) % 2 === 0) {
+        pc.fillStyle = `rgba(${POT.terra},${0.25 * dim})`;
+        pc.fillRect(x + Math.floor(cell / 2), y + Math.floor(cell / 2), 1, 1);
+      }
+    }
+  }
+  // Τοίχοι: φωτεινές γραμμές πηλού εκεί που ένα ανοιχτό κελί ακουμπάει τοίχο.
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (!shown(tx, ty) || L.isOpaque(tx, ty)) continue;
+      const x = ox + tx * cell, y = oy + ty * cell;
+      pc.fillStyle = `rgba(${POT.light},${L.regionAt(tx, ty) === here ? 0.95 : 0.5})`;
+      if (L.isOpaque(tx, ty - 1)) pc.fillRect(x, y, cell, 1);
+      if (L.isOpaque(tx, ty + 1)) pc.fillRect(x, y + cell - 1, cell, 1);
+      if (L.isOpaque(tx - 1, ty)) pc.fillRect(x, y, 1, cell);
+      if (L.isOpaque(tx + 1, ty)) pc.fillRect(x + cell - 1, y, 1, cell);
+    }
+  }
+
+  // Εσύ: μια κουκκίδα που αναβοσβήνει, με δαχτυλίδι που απλώνει σαν κύμα.
+  const now = performance.now() / 1000;
+  const px = Math.round(ox + (player.x / TILE) * cell), py = Math.round(oy + (player.y / TILE) * cell);
+  const ring = (now * 0.8) % 1;
+  pc.strokeStyle = `rgba(${POT.light},${(0.8 * (1 - ring)).toFixed(3)})`;
+  pc.lineWidth = 1;
+  pc.beginPath();
+  pc.arc(px + 0.5, py + 0.5, 2 + ring * cell * 2.5, 0, Math.PI * 2);
+  pc.stroke();
+  pc.fillStyle = Math.floor(now * 3) % 2 ? `rgb(${POT.cream})` : `rgb(${POT.light})`;
+  pc.fillRect(px - 1, py - 1, 3, 3);
+
+  Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.5, 1);
+  Pottery.meander(pc, 0, H - 7, W, 7, POT.terra, 0.5, 1);
+}
+
+function openMap() {
+  if (state !== 'play') return;
+  setState('map');
+  stopInput();
+  const ch = CHAPTERS[Math.max(0, playerRegion())];
+  $('map-chapter').textContent = `${ch.numeral}. ${ch.name}`;
+  showScreen('map');
+  document.body.classList.add('map-open');
+}
+
+function closeMap() {
+  if (state !== 'map') return;
+  setState('play');
+  showScreen(null);
+  document.body.classList.remove('map-open');
 }
 
 function drawDebugMap() {
@@ -823,6 +946,7 @@ function doAction(action) {
   else if (action === 'settings') showScreen('settings');
   else if (action === 'back') showScreen('menu');
   else if (action === 'resume') resumeGame();
+  else if (action === 'map-close') closeMap();
   else if (action === 'menu') goToMenu();
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
   else if (action === 'vibration') {
@@ -864,6 +988,7 @@ function init() {
     btn.addEventListener('click', (e) => { e.preventDefault(); doAction(btn.dataset.action); });
   }
   $('btn-pause').addEventListener('pointerdown', (e) => { e.preventDefault(); pauseGame(); });
+  $('btn-map').addEventListener('pointerdown', (e) => { e.preventDefault(); openMap(); });
   jarBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); throwJar(); });
   melodyBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); playMelody(); });
 
@@ -880,6 +1005,8 @@ function init() {
       const scr = visibleScreen();
       const primary = scr && scr.querySelector('.primary:not(.hidden)');
       if (primary) doAction(primary.dataset.action);
+    } else if (state === 'map' && (e.code === 'Escape' || e.code === 'KeyM' || e.code === 'KeyP')) {
+      if (!e.repeat) closeMap();
     } else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (state === 'play') pauseGame();
       else if (state === 'paused') resumeGame();
@@ -887,8 +1014,8 @@ function init() {
       throwJar();
     } else if (e.code === 'KeyQ' && !e.repeat) {
       playMelody();
-    } else if (e.code === 'KeyM') {
-      showMap = !showMap;
+    } else if (e.code === 'KeyM' && !e.repeat) {
+      openMap();
     }
   });
 

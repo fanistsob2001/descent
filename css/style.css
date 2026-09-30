@@ -223,6 +223,12 @@ body {
   justify-self: end;
 }
 
+.hud-left {
+  display: flex;
+  gap: 10px;
+  justify-self: start;
+}
+
 .hud-btn {
   position: relative;
   width: 48px;
@@ -613,5 +619,41 @@ body {
 
   #level-intro {
     padding-top: 16vh;
+  }
+}
+
+/* ---- Χάρτης ---- */
+/* Ο χάρτης ζωγραφίζεται στο canvas· η οθόνη έχει μόνο τον τίτλο (πάνω) και το Back (κάτω). */
+#map-screen {
+  background: transparent;
+  justify-content: space-between;
+  padding-top: calc(var(--safe-top) + 18px);
+  padding-bottom: 22px;
+  animation: none;
+}
+
+#map-chapter {
+  opacity: 0.85;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Όσο είναι ανοιχτός ο χάρτης, τα μηνύματα του παιχνιδιού κρύβονται. */
+body.map-open #hint,
+body.map-open #notice,
+body.map-open #level-intro {
+  visibility: hidden;
+}
+
+/* ---- Μενού: ο χώρος της σκηνής σε pixel art (τη ζωγραφίζει το canvas, Fx.drawMenu) ---- */
+#menu-art {
+  flex: none;
+  width: min(340px, 92vw);
+  height: min(21vh, 170px);
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  #menu-art {
+    display: none;
   }
 }
