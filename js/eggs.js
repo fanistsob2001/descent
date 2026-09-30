@@ -31,7 +31,7 @@ const Eggs = {
       // Ο τοίχος ανατολικά του: περπατάει προς τα εκεί ξανά και ξανά.
       const tx = Math.floor(e.stuck.x / TILE), ty = Math.floor(e.stuck.y / TILE);
       let wx = tx + 1;
-      while (!Level.isWall(wx, ty)) wx++;
+      while (!Level.isOpaque(wx, ty)) wx++;
       this.stuck = {
         x: e.stuck.x, y: e.stuck.y, startX: e.stuck.x, wallX: wx * TILE - MONSTER_RADIUS,
         phase: 'walk', phaseUntil: 0, bumpAt: -1e6,

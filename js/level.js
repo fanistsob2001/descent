@@ -9,10 +9,16 @@ const WALL_SAMPLE_STEP = 5;
 
 // Οι χάρτες των κεφαλαίων βρίσκονται στο js/levels.js.
 
+// Είδη εδάφους (Level.terrain). Το νερό και το χάσμα δεν περπατιούνται, αλλά ο ήχος
+// περνάει από πάνω τους (οι τοίχοι της απέναντι όχθης φωτίζονται, οι σκιές ακούνε).
+const T_FLOOR = 0, T_WALL = 1, T_WATER = 2, T_CHASM = 3;
+
 const Level = {
   cols: 0,
   rows: 0,
-  grid: null,          // Uint8Array, 1 = τοίχος
+  grid: null,          // Uint8Array, 1 = δεν περπατιέται (τοίχος, νερό, χάσμα, κλειστή πύλη)
+  opaque: null,        // Uint8Array, 1 = σταματάει τον ήχο (μόνο τοίχοι και κλειστή πύλη)
+  terrain: null,       // Uint8Array, T_FLOOR | T_WALL | T_WATER | T_CHASM
   region: null,        // Int8Array: σε ποιο κεφάλαιο ανήκει κάθε κελί (-1 = γέμισμα)
   start: { x: 0, y: 0 },
   monsters: [],        // { x, y, guard, region } — θέσεις εκκίνησης των σκιών
@@ -49,6 +55,8 @@ const Level = {
     this.cols = Math.max(...chapters.map((c, i) => offsets[i] + c.map[0].length));
     this.rows = chapters.reduce((sum, c) => sum + c.map.length, 0);
     this.grid = new Uint8Array(this.cols * this.rows).fill(1);
+    this.opaque = new Uint8Array(this.cols * this.rows).fill(1);
+    this.terrain = new Uint8Array(this.cols * this.rows).fill(T_WALL);
     this.region = new Int8Array(this.cols * this.rows).fill(-1);
     this.monsters = [];
     this.altars = [];
@@ -64,7 +72,10 @@ const Level = {
           const wx = offsets[r] + x, wy = top + y;
           const i = wy * this.cols + wx;
           const c = line[x];
-          this.grid[i] = c === '#' ? 1 : 0;
+          const t = c === '#' ? T_WALL : c === '~' ? T_WATER : c === ':' ? T_CHASM : T_FLOOR;
+          this.terrain[i] = t;
+          this.grid[i] = t === T_FLOOR ? 0 : 1;
+          this.opaque[i] = t === T_WALL ? 1 : 0;
           this.region[i] = r;
           const cx = (wx + 0.5) * TILE, cy = (wy + 0.5) * TILE;
           if (c === 'S') { this.start.x = cx; this.start.y = cy; }
@@ -111,6 +122,7 @@ const Level = {
     const g = this.gates[i];
     g.open = open;
     this.grid[g.ty * this.cols + g.tx] = open ? 0 : 1;
+    this.opaque[g.ty * this.cols + g.tx] = open ? 0 : 1;
     for (let k = 0; k < this.segCount; k++) {
       if (this.segGate[k] === i) this.segFade[k] = open ? 0 : this.segBaseFade[k];
     }
@@ -119,6 +131,17 @@ const Level = {
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
     return this.grid[ty * this.cols + tx] === 1;
+  },
+
+  // Σταματάει τον ήχο (και την οπτική επαφή) αυτό το κελί;
+  isOpaque(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
+    return this.opaque[ty * this.cols + tx] === 1;
+  },
+
+  terrainAt(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return T_WALL;
+    return this.terrain[ty * this.cols + tx];
   },
 
   regionAt(tx, ty) {
@@ -243,11 +266,11 @@ const Level = {
     for (let ty = 0; ty < this.rows; ty++) {
       for (let tx = 0; tx < this.cols; tx++) {
         const gate = gateAt(tx, ty);
-        if (!this.isWall(tx, ty) && gate < 0) continue;
+        if (!this.isOpaque(tx, ty) && gate < 0) continue;
         for (const s of sides) {
           const ntx = tx + s.nx, nty = ty + s.ny;
           if (ntx < 0 || nty < 0 || ntx >= this.cols || nty >= this.rows) continue;
-          if (this.isWall(ntx, nty)) continue;
+          if (this.isOpaque(ntx, nty)) continue;
           const bx = tx * TILE + s.ox, by = ty * TILE + s.oy;
           for (let k = 0; k < per; k++) {
             const x1 = bx + s.ax * len * k, y1 = by + s.ay * len * k;
@@ -288,7 +311,7 @@ const Level = {
     while (t < maxDist) {
       if (tMaxX < tMaxY) { t = tMaxX; tMaxX += tDeltaX; tx += stepX; }
       else { t = tMaxY; tMaxY += tDeltaY; ty += stepY; }
-      if (this.isWall(tx, ty)) return Math.min(t, maxDist);
+      if (this.isOpaque(tx, ty)) return Math.min(t, maxDist);
     }
     return maxDist;
   },
@@ -312,7 +335,7 @@ const Level = {
     while (tx !== ex || ty !== ey) {
       if (tMaxX < tMaxY) { tMaxX += tDeltaX; tx += stepX; }
       else { tMaxY += tDeltaY; ty += stepY; }
-      if (this.isWall(tx, ty)) return false;
+      if (this.isOpaque(tx, ty)) return false;
       if (++guard > 256) return false;
     }
     return true;
