@@ -738,7 +738,7 @@ const Sound = {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
 
-    // 1) Το χτύπημα: πέτρα που πέφτει + βαθύς "μπουμ".
+    // 1) Το χτύπημα: βαθύς "μπουμ" + θόρυβος, τη στιγμή που ορμάει.
     const boom = ac.createOscillator();
     boom.type = 'sine';
     boom.frequency.setValueAtTime(95, t);
@@ -815,22 +815,23 @@ const Sound = {
       vib.stop(t + 1.3);
     });
 
-    // 3) Ο πηλός που τρίζει και σπάει: μικρά κοφτά "τακ" ψηλών συχνοτήτων.
-    for (let i = 0; i < 12; i++) {
-      const tt = t + 0.04 + Math.random() * 0.6;
-      const n = this.noiseSource();
-      const hp = ac.createBiquadFilter();
-      hp.type = 'bandpass';
-      hp.frequency.value = 2400 + Math.random() * 4200;
-      hp.Q.value = 4;
-      const g = ac.createGain();
-      this.envelope(g.gain, tt, 0.16 + Math.random() * 0.14, 0.001, 0.02 + Math.random() * 0.05);
-      n.connect(hp);
-      hp.connect(g);
-      g.connect(this.sfx);
-      n.start(tt, Math.random() * 1.5);
-      n.stop(tt + 0.09);
+    // 3) Το στρίγγλισμα της σκιάς σε 8-bit: τετραγωνικός τόνος που πηδάει τυχαία σε
+    //    ψηλές νότες, σαν χαλασμένο σήμα — εκεί που "σπάει" και η εικόνα (0.19 δευτ. και μετά).
+    const sq = ac.createOscillator();
+    sq.type = 'square';
+    const sg = ac.createGain();
+    sg.gain.setValueAtTime(0.0001, t);
+    for (let tt = 0.19; tt < 0.62; tt += 0.028) {
+      sq.frequency.setValueAtTime(700 + Math.random() * 1900, t + tt);
+      // Κενά ανάμεσα στα "κομμάτια", σαν τραυλισμός.
+      sg.gain.setValueAtTime(Math.random() < 0.75 ? 0.13 : 0.0001, t + tt);
     }
+    sg.gain.setValueAtTime(0.0001, t + 0.62);
+    sq.connect(sg);
+    sg.connect(this.sfx);
+    sg.connect(this.echoSend);
+    sq.start(t + 0.19);
+    sq.stop(t + 0.65);
   },
 
 

@@ -1,212 +1,188 @@
 'use strict';
 
-// Jump scare (STORY.md, ενότητα 6): το πρόσωπο μιας σκιάς σε στυλ αγγείου — ένα
-// γοργόνειο, όπως στον πάτο των αρχαίων κυλίκων. Ορμάει πάνω σου από το σκοτάδι, με
-// χέρια σκιών που απλώνονται από τις άκρες, και μετά ο δίσκος σπάει σε κομμάτια
-// σαν αγγείο που πέφτει στο πάτωμα.
+// Jump scare: το πρόσωπο της σκιάς που σε έπιασε, σε pixel art — το ίδιο τέρας με τα
+// sprites του παιχνιδιού (κάρβουνο, περίγραμμα πηλού, λευκά μάτια που λάμπουν), από πολύ
+// κοντά. Ορμάει από το σκοτάδι, το στόμα ανοίγει, χέρια με νύχια σε αρπάζουν από κάτω,
+// η εικόνα "σπάει" σαν χαλασμένο σήμα και στο τέλος τα μάτια φλέγονται.
+// Ζωγραφίζεται στον μικρό καμβά του Pixel (σε art pixels), όπως όλος ο κόσμος.
 const SCARE_TIME = 0.65;    // συνολική διάρκεια (δευτ.)
-const SCARE_LUNGE = 0.42;   // ώσπου να φτάσει ολόκληρο το πρόσωπο· μετά σπάει
-const SCARE_DISC = 512;     // μέγεθος του "ψημένου" δίσκου στο παρασκήνιο (pixels)
-const SCARE_R = 250;        // ακτίνα του δίσκου μέσα σε αυτό
+const SCARE_LUNGE = 0.3;    // ώσπου να γεμίσει την οθόνη το πρόσωπο
+
+// Το πρόσωπο, από μπροστά. Γράφεται μόνο το αριστερό μισό· το δεξί είναι καθρέφτης.
+// k/K = κάρβουνο, p = λάμψη γύρω από τα μάτια, E = λευκά μάτια, R/r = το στόμα, P = δόντια.
+const SCARE_HEAD = [
+  '..........kkkkk',
+  '.......kkkkkkkk',
+  '.....kkkkkkkkkk',
+  '....Kkkkkkkkkkk',
+  '...Kkkkkkkkkkkk',
+  '...KkkkkkkkkkKk',
+  '..KkkKKKKKKkkKk',
+  '..KkKKKKKKKKkkk',
+  '..KKKKpEEpKKkkk',
+  '..KKKpEEEEpKkkk',
+  '..KKKpEEEEpKkkk',
+  '..KkKKpEEpKKkkk',
+  '..KkKKKKKKKKkkk',
+  '...KkkKKKKkkkkk',
+  '...KKkkKkkkkKkk',
+  '...KKkkKkkkkKkk',
+  '....KkkKkkkkkkk',
+];
+// Το στόμα σε τρία καρέ: κλειστό, μισάνοιχτο, ορθάνοιχτο με κοφτερά δόντια (8 γραμμές).
+const SCARE_MOUTH = [
+  ['....Kkkkkkkkkkk', '....Kkkkkkkkkkk', '....KkkkkkkkKKK', '....KkKKKKKKkkk',
+   '....Kkkkkkkkkkk', '.....Kkkkkkkkkk', '.....Kkkkkkkkkk', '.....kkkkkkkkkk'],
+  ['....Kkkkkkkkkkk', '....Kkkkkkkkkkk', '....KkKRRRRRRRR', '....KKPRPRPRPRP',
+   '....KKPRPRPRPRP', '.....KRRRRRRRRR', '.....Kkkkkkkkkk', '.....kkkkkkkkkk'],
+  ['....KkKRRRRRRRR', '....KKPRPRPRPRP', '....KKRPRRRPRRR', '....KKRrrrrrrrr',
+   '....KKRrrrrrrrr', '....KKRRPRRRPRR', '....KKPRPRPRPRP', '.....KKRRRRRRRR'],
+];
+const SCARE_CHIN = [
+  '.....kkkkkkkkkk',
+  '......kkkkkkkkk',
+  '........kkkkkkk',
+  '..........kkkkk',
+];
+// Χέρι σκιάς με νύχια, που ανεβαίνει από κάτω (το δεξί είναι καθρέφτης του).
+const SCARE_HAND = [
+  '.PP..PP..PP.....',
+  '.kk..kk..kk.....',
+  '.kk..kk..kk..PP.',
+  '.kk..kk..kk..kk.',
+  '.kkk.kkk.kkk.kk.',
+  '..kk..kk..kk.kk.',
+  '..kkkkkkkkkkkkk.',
+  '..kkkkkkkkkkkkk.',
+  '..kkkkkkkkkkkk..',
+  '...kkkkkkkkkkk..',
+  '...kkkkkkkkkk...',
+  '....kkkkkkkk....',
+  '....kkkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+  '.....kkkkkk.....',
+];
+// Κέντρα των ματιών στο πρόσωπο (σε pixels του sprite, με το περίγραμμα).
+const SCARE_EYES = [[8.5, 10.5], [22.5, 10.5]];
 
 const Scare = {
+  faces: null,    // ένα sprite για κάθε καρέ του στόματος
+  hand: null,
+  hands: [],      // από πού ανεβαίνουν τα χέρια αυτή τη φορά
   seed: 0,
-  disc: null,       // παρασκήνιο canvas με τον δίσκο ζωγραφισμένο μία φορά
-  pieces: [],       // τα θραύσματα του δίσκου
-  hands: [],        // τα χέρια που απλώνονται
 
-  // Ετοιμάζει ένα νέο, λίγο διαφορετικό πρόσωπο κάθε φορά (μία φορά ανά θάνατο).
+  build() {
+    const mirror = (r) => r + [...r].reverse().join('');
+    this.faces = SCARE_MOUTH.map((mouth) =>
+      Sprites.build([...SCARE_HEAD, ...mouth, ...SCARE_CHIN].map(mirror), POT.terra));
+    this.hand = Sprites.build(SCARE_HAND, POT.terra);
+  },
+
+  // Ετοιμάζει ένα λίγο διαφορετικό jump scare κάθε φορά (μία φορά ανά θάνατο).
   prepare() {
+    if (!this.faces) this.build();
     this.seed = Math.random() * 100;
-    if (!this.disc) {
-      this.disc = document.createElement('canvas');
-      this.disc.width = this.disc.height = SCARE_DISC;
-    }
-    const c = this.disc.getContext('2d');
-    c.clearRect(0, 0, SCARE_DISC, SCARE_DISC);
-    Pottery.gorgoneion(c, SCARE_DISC / 2, SCARE_DISC / 2, SCARE_R, this.seed);
-    Pottery.fire(c, SCARE_DISC / 2, SCARE_DISC / 2, SCARE_R, this.seed);
-
-    // Θραύσματα: εσωτερικός δακτύλιος από 5 τριγωνικά κομμάτια και εξωτερικός από 11 τετράπλευρα.
-    this.pieces = [];
-    const ringPoints = (n) => {
-      const a0 = Math.random() * 6.283, out = [];
-      for (let i = 0; i < n; i++) out.push(a0 + (i + (Math.random() - 0.5) * 0.5) / n * 6.283);
-      return out;
-    };
-    const P = (r, a) => [Math.cos(a) * r, Math.sin(a) * r];
-    const ri = 0.42, ro = 1.04;
-    const inner = ringPoints(5), outer = ringPoints(11);
-    const add = (poly) => {
-      const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
-      const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
-      const len = Math.hypot(cx, cy) || 1;
-      this.pieces.push({
-        poly, cx, cy,
-        vx: cx / len + (Math.random() - 0.5) * 0.5,
-        vy: cy / len + (Math.random() - 0.5) * 0.5,
-        rot: (Math.random() - 0.5) * 3.2,
-        speed: 0.9 + Math.random() * 0.8,
+    // Δύο ή τρία χέρια: x = θέση στο πλάτος της οθόνης, flip = δεξί χέρι.
+    const n = Math.random() < 0.5 ? 2 : 3;
+    this.hands = [];
+    for (let i = 0; i < n; i++) {
+      const left = i % 2 === 0;
+      this.hands.push({
+        x: i === 2 ? 0.4 + Math.random() * 0.2 : left ? 0.14 + Math.random() * 0.12 : 0.74 + Math.random() * 0.12,
+        flip: !left,
+        delay: 0.14 + Math.random() * 0.1,
+        reach: 0.55 + Math.random() * 0.25,
       });
-    };
-    inner.forEach((a, i) => add([[0, 0], P(ri, a), P(ri, inner[(i + 1) % inner.length] + (i + 1 === inner.length ? 6.283 : 0))]));
-    outer.forEach((a, i) => {
-      const b = outer[(i + 1) % outer.length] + (i + 1 === outer.length ? 6.283 : 0);
-      // Τα όρια του εξωτερικού δακτυλίου δεν ταιριάζουν ακριβώς με του εσωτερικού: είναι
-      // σπασμένα με ανώμαλο τρόπο, όπως σπάει ο πηλός.
-      add([P(ri * 0.95, a), P(ro, a), P(ro, b), P(ri * 1.02, b)]);
-    });
-
-    // Τέσσερα χέρια σκιών από τις άκρες της οθόνης.
-    // from = από πού μπαίνουν στην οθόνη (κλάσμα οθόνης), to = πού φτάνουν (σε ακτίνες
-    // του προσώπου από το κέντρο του): πάνω από τον δίσκο, σαν να σε αρπάζουν.
-    this.hands = [
-      { from: [-0.08, 0.86], to: [-0.6, 0.5], size: 1.0, seed: 1.3 },
-      { from: [1.08, 0.8], to: [0.62, 0.42], size: 1.05, seed: 2.9 },
-      { from: [0.1, 1.08], to: [-0.22, 0.86], size: 0.95, seed: 4.1 },
-      { from: [0.95, 1.08], to: [0.3, 0.9], size: 0.9, seed: 5.7 },
-    ];
-  },
-
-  // Ένα χέρι σκιάς: μακρύς, λεπτός βραχίονας που στενεύει, παλάμη και πέντε μακριά
-  // δάχτυλα με νύχια. (bx, by) = η βάση, (hx, hy) = ο καρπός, size = πάχος.
-  hand(ctx, bx, by, hx, hy, size, seed, alpha) {
-    const ang = Math.atan2(hy - by, hx - bx);
-    const nx = -Math.sin(ang), ny = Math.cos(ang);
-    const w0 = size * 0.95, w1 = size * 0.3;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(bx + nx * w0, by + ny * w0);
-    ctx.lineTo(hx + nx * w1, hy + ny * w1);
-    ctx.lineTo(hx - nx * w1, hy - ny * w1);
-    ctx.lineTo(bx - nx * w0, by - ny * w0);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(bx, by, hx, hy);
-    g.addColorStop(0, 'rgba(40,8,6,0.98)');
-    g.addColorStop(1, 'rgba(110,26,20,0.98)');
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.strokeStyle = Pottery.rgba(POT.light, 0.55);
-    ctx.lineWidth = Math.max(1, size * 0.06);
-    ctx.stroke();
-
-    // Παλάμη.
-    ctx.save();
-    ctx.translate(hx, hy);
-    ctx.rotate(ang);
-    ctx.beginPath();
-    ctx.ellipse(size * 0.32, 0, size * 0.5, size * 0.42, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(110,26,20,0.98)';
-    ctx.fill();
-    ctx.stroke();
-    // Δάχτυλα: λυγισμένα, με νύχια στην άκρη.
-    for (let i = 0; i < 5; i++) {
-      const spread = (i - 2) * 0.42;
-      const len = size * (1.1 + (i === 2 ? 0.35 : 0) - Math.abs(i - 2) * 0.12);
-      const curl = Math.sin(seed + i * 1.7) * 0.45 + (i - 2) * 0.12;
-      const sx = size * 0.72, sy = (i - 2) * size * 0.16;
-      const ex = sx + Math.cos(spread) * len, ey = sy + Math.sin(spread) * len;
-      ctx.strokeStyle = 'rgba(110,26,20,0.98)';
-      ctx.lineWidth = size * 0.17;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.quadraticCurveTo((sx + ex) / 2 + Math.sin(spread + curl) * len * 0.3, (sy + ey) / 2 + curl * len * 0.35, ex, ey);
-      ctx.stroke();
-      ctx.strokeStyle = Pottery.rgba(POT.cream, 0.9);
-      ctx.lineWidth = size * 0.06;
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex + Math.cos(spread + curl) * size * 0.28, ey + Math.sin(spread + curl) * size * 0.28);
-      ctx.stroke();
     }
-    ctx.restore();
-    ctx.restore();
   },
 
-  // t = δευτ. από τη στιγμή του θανάτου. Σχεδιάζει σε συντεταγμένες οθόνης.
+  // t = δευτ. από τη στιγμή του θανάτου. (w, h) = μέγεθος του μικρού καμβά (art pixels).
   draw(ctx, w, h, t) {
     if (t > SCARE_TIME) return;
+    if (!this.faces) this.build();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
 
-    // Πρώτα ένα στιγμιαίο φλας στο χρώμα του πηλού.
-    if (t < 0.05) {
-      ctx.fillStyle = Pottery.rgba(POT.terra, 1);
+    // Πρώτα ένα στιγμιαίο κόκκινο φλας.
+    if (t < 0.04) {
+      ctx.fillStyle = Pottery.rgba(POT.red, 1);
       ctx.fillRect(0, 0, w, h);
       return;
     }
-
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
 
-    // "Τρεμόπαιγμα" σαν χαλασμένη εικόνα.
-    if (t > 0.21 && t < 0.235) return;
-
-    const lunge = Math.min(1, t / SCARE_LUNGE);
+    // Ορμάει: από μικρό στο βάθος ως λίγο μεγαλύτερο από την οθόνη.
+    const lunge = Math.min(1, (t - 0.04) / (SCARE_LUNGE - 0.04));
     const grow = 1 - Math.pow(1 - lunge, 3);
-    const R = Math.min(w, h) * (0.2 + 0.5 * grow);
-    const jit = R * 0.028;
-    const cx = w / 2 + (Math.random() - 0.5) * jit;
-    const cy = h * 0.47 + (Math.random() - 0.5) * jit;
-    const shatter = t > SCARE_LUNGE ? (t - SCARE_LUNGE) / (SCARE_TIME - SCARE_LUNGE) : 0;
+    const face = this.faces[t < 0.13 ? 0 : t < 0.22 ? 1 : 2];
+    const fw = Math.min(w, h * 0.85) * (0.12 + 1.05 * grow);
+    const k = fw / face.w;
+    const fh = face.h * k;
+    const shake = 1 + grow * 3 + (t > 0.45 ? 3 : 0);
+    const cx = w / 2 + (Math.random() - 0.5) * shake;
+    const cy = h * 0.46 + (Math.random() - 0.5) * shake;
+    const x0 = Math.round(cx - fw / 2), y0 = Math.round(cy - fh / 2);
 
-    // Κόκκινη λάμψη πίσω από τον δίσκο.
-    const halo = ctx.createRadialGradient(cx, cy, R * 0.7, cx, cy, R * 1.9);
-    halo.addColorStop(0, Pottery.rgba(POT.red, 0.65 * (1 - shatter)));
+    // Κόκκινη λάμψη πίσω από το κεφάλι.
+    const halo = ctx.createRadialGradient(cx, cy, fw * 0.2, cx, cy, fw * 0.9);
+    halo.addColorStop(0, Pottery.rgba(POT.red, 0.55));
     halo.addColorStop(1, Pottery.rgba(POT.red, 0));
     ctx.fillStyle = halo;
     ctx.fillRect(0, 0, w, h);
 
-    // Ο δίσκος: ολόκληρος όσο ορμάει, θραύσματα όταν σπάει.
-    const k = R / SCARE_R;
-    const half = (SCARE_DISC / 2) * k;
-    if (shatter === 0) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(Math.sin(t * 46) * 0.018);
-      ctx.drawImage(this.disc, -half, -half, half * 2, half * 2);
-      ctx.restore();
-    } else {
-      const u = shatter;
-      for (const pc of this.pieces) {
-        const dist = R * 1.7 * pc.speed * u * u;
-        const ox = pc.vx * dist, oy = pc.vy * dist + R * 0.9 * u * u;
-        ctx.save();
-        ctx.translate(cx + ox, cy + oy);
-        ctx.translate(pc.cx * R, pc.cy * R);
-        ctx.rotate(pc.rot * u);
-        ctx.translate(-pc.cx * R, -pc.cy * R);
-        ctx.beginPath();
-        pc.poly.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0] * R, p[1] * R) : ctx.lineTo(p[0] * R, p[1] * R)));
-        ctx.closePath();
-        ctx.clip();
-        ctx.globalAlpha = Math.max(0, 1 - u * u);
-        ctx.drawImage(this.disc, -half, -half, half * 2, half * 2);
-        ctx.restore();
+    // Το πρόσωπο. Στις στιγμές της "παρεμβολής" κόβεται σε λωρίδες που γλιστράνε στο πλάι.
+    const glitch = (t > 0.19 && t < 0.235) || (t > 0.5 && Math.random() < 0.5);
+    if (glitch) {
+      const bands = 7;
+      for (let b = 0; b < bands; b++) {
+        const sy = (face.h / bands) * b, sh = face.h / bands;
+        const off = Math.round((Math.random() - 0.5) * fw * 0.18);
+        ctx.drawImage(face.c, 0, sy, face.w, sh, x0 + off, y0 + sy * k, fw, sh * k);
       }
+    } else {
+      ctx.drawImage(face.c, x0, y0, fw, fh);
     }
 
-    // Τα χέρια των σκιών, μπροστά από τον δίσκο.
-    const handSize = Math.min(w, h) * 0.105;
+    // Τα μάτια λάμπουν — και στο τέλος φλέγονται.
+    const flare = t > 0.42 ? (t - 0.42) / (SCARE_TIME - 0.42) : 0;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [ex, ey] of SCARE_EYES) {
+      const px = x0 + ex * k, py = y0 + ey * k;
+      const R = k * (3 + flare * 6) * (0.9 + 0.2 * Math.random());
+      const g = ctx.createRadialGradient(px, py, 0, px, py, R);
+      g.addColorStop(0, `rgba(255,250,235,${(0.55 + 0.45 * flare).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,250,235,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(px - R, py - R, R * 2, R * 2);
+    }
+    ctx.restore();
+
+    // Χέρια με νύχια που ανεβαίνουν από κάτω και σε αρπάζουν.
+    const hk = Math.max(2, Math.round(k * 0.6));
+    const hw = this.hand.w * hk, hh = this.hand.h * hk;
     for (const hd of this.hands) {
-      const p = Math.min(1, grow * 1.05);
-      const bx = hd.from[0] * w, by = hd.from[1] * h;
-      const tx = cx + hd.to[0] * R, ty = cy + hd.to[1] * R;
-      const hx = bx + (tx - bx) * p + (Math.random() - 0.5) * 2.5;
-      const hy = by + (ty - by) * p + (Math.random() - 0.5) * 2.5;
-      this.hand(ctx, bx, by, hx, hy, handSize * hd.size, hd.seed, 1 - shatter * 0.85);
+      const p = Math.max(0, Math.min(1, (t - hd.delay) / 0.14));
+      if (p <= 0) continue;
+      const rise = 1 - Math.pow(1 - p, 2);
+      const hx = Math.round(hd.x * w - hw / 2 + (Math.random() - 0.5) * 2);
+      const hy = Math.round(h - hh * hd.reach * rise + (Math.random() - 0.5) * 2);
+      ctx.drawImage(hd.flip ? this.hand.f : this.hand.c, hx, hy, hw, hh);
     }
 
-    // Ζώνες μαιάνδρου πάνω και κάτω, σαν το στεφάνι του αγγείου.
-    const band = Math.max(14, w * 0.05);
-    Pottery.meander(ctx, 0, h * 0.06, w, band, POT.terra, 0.9 * (1 - shatter));
-    Pottery.meander(ctx, 0, h * 0.94 - band, w, band, POT.terra, 0.9 * (1 - shatter));
-
-    // Γρατζουνιές "παρεμβολής" πάνω από όλα.
-    ctx.fillStyle = Pottery.rgba(POT.light, 0.09);
-    for (let i = 0; i < 34; i++) {
-      ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * w * 0.3, 1 + Math.random() * 2);
+    // Λωρίδες "παρεμβολής" σαν χαλασμένο σήμα, πάνω από όλα.
+    ctx.fillStyle = Pottery.rgba(POT.light, 0.12);
+    for (let i = 0; i < 10; i++) {
+      ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * w * 0.4, 1);
     }
+    // Ο λεπτός μαίανδρος πάνω και κάτω, όπως στην οθόνη του παιχνιδιού.
+    Pottery.meander(ctx, 0, 0, w, 7, POT.terra, 0.6, 1);
+    Pottery.meander(ctx, 0, h - 7, w, 7, POT.terra, 0.6, 1);
   },
 };

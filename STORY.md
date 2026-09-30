@@ -59,7 +59,7 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 - Waves reveal walls as terracotta lines (and the clay floor tiles), as if uncovering a painted vase.
 - Smooth camera follow, subtle screen shake on jump scares. Works in portrait and landscape.
 - Characters (Orpheus, shades, Charon, Eurydice) are drawn as simple silhouettes in the same style.
-- The jump scare face is a shade drawn in the same pottery style.
+- The jump scare face is the face of a shade, drawn like the shades in the game (same pixel style, same glowing white eyes).
 
 ## 7. Menu and cutscenes
 
