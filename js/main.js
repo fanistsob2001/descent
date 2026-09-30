@@ -9,7 +9,8 @@ const STEP_LENGTH = 32;            // απόσταση ανάμεσα σε δύ�
 const STEP_WAVE = { radius: 65, strength: 0.22 };                   // αχνά βήματα (μόνο όταν τρέχεις)
 const CALL_WAVE = { minR: 110, maxR: 560, minS: 0.5, maxS: 1.0 };   // το "κύμα" του παίκτη
 
-// Πόσος κόσμος χωράει στην οθόνη (τουλάχιστον τόσο πλάτος / ύψος).
+// Πόσος κόσμος χωράει στην οθόνη (τουλάχιστον τόσο πλάτος / ύψος σε κατακόρυφη θέση·
+// σε οριζόντια οι δύο τιμές αλλάζουν θέση, ώστε οι μορφές να έχουν το ίδιο μέγεθος).
 const VIEW_MIN_W = 440;
 const VIEW_MIN_H = 700;
 
@@ -75,7 +76,11 @@ function resize() {
   canvas.height = Math.round(cssH * dpr);
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
-  scale = Math.min(cssW / VIEW_MIN_W, cssH / VIEW_MIN_H);
+  const landscape = cssW > cssH;
+  scale = landscape
+    ? Math.min(cssW / VIEW_MIN_H, cssH / VIEW_MIN_W)
+    : Math.min(cssW / VIEW_MIN_W, cssH / VIEW_MIN_H);
+  document.body.classList.toggle('landscape', landscape);
   Pixel.resize(cssW, cssH);
 }
 window.addEventListener('resize', resize);
@@ -599,11 +604,7 @@ function goFullscreen() {
   try {
     const p = req.call(el, { navigationUI: 'hide' });
     if (p && p.then) {
-      p.then(() => {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('portrait').catch(() => {});
-        }
-      }).catch(() => {});
+      p.catch(() => {});
     }
   } catch (_) { /* π.χ. iPhone: δεν υποστηρίζεται, συνεχίζουμε κανονικά */ }
 }
