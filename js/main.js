@@ -122,6 +122,15 @@ function updatePlayer(dt) {
   }
 }
 
+// Κύμα που ακυρώθηκε με σύρσιμο: απαλός ήχος "ξεφουσκώματος" και το δαχτυλίδι μαζεύεται.
+const cancelFx = { t: -1e6, r: 0 };
+function cancelCall(amount) {
+  if (state !== 'play') return;
+  cancelFx.t = gameTime;
+  cancelFx.r = player.r + 4 + amount * 16;
+  Sound.cancel();
+}
+
 function emitCall(held) {
   if (state !== 'play') return;
   const c = Math.min(1, held / MAX_CHARGE);
@@ -132,6 +141,24 @@ function emitCall(held) {
   Sound.voice(c, strings >= 3);
   Hints.notify('call');
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
+}
+
+// Στο V, όσο φορτίζεις πέρα από το όριο: ήχος έντασης που ανεβαίνει και παλμοί δόνησης.
+let warnOn = false, nextWarnPulse = 0;
+function updateLookBackWarning() {
+  const warn = state === 'play' && Input.charging && Input.chargeAmount() >= LOOK_BACK_CHARGE && lookBackRuleActive();
+  if (warn && !warnOn) {
+    Sound.tension(true);
+    vibrate([60, 40, 60]);
+    nextWarnPulse = gameTime + 0.45;
+  } else if (!warn && warnOn) {
+    Sound.tension(false);
+  }
+  if (warn && gameTime >= nextWarnPulse) {
+    vibrate(35);
+    nextWarnPulse = gameTime + 0.45;
+  }
+  warnOn = warn;
 }
 
 // Μια σκιά μόλις άκουσε κάτι: ψιθυρίζει (STORY.md, ενότητα 10) — αν είναι αρκετά
@@ -288,18 +315,55 @@ function draw() {
 function drawPlayer() {
   const c = Input.chargeAmount();
 
-  // Φόρτιση: ένα μικρό δαχτυλίδι που μεγαλώνει και "τρέμει" όσο κρατάς.
+  // Φόρτιση: ένα δαχτυλίδι που μεγαλώνει και "τρέμει" όσο κρατάς.
   if (Input.charging) {
     const pulse = 0.5 + 0.5 * Math.sin(gameTime * (8 + c * 16));
     const rr = player.r + 4 + c * 16;
-    ctx.lineWidth = 1.5 / scale;
-    const warn = c >= LOOK_BACK_CHARGE && lookBackRuleActive();
-    // Κανονικά στο χρώμα του πηλού· κόκκινο (έντονο) όταν στο V θα σήμαινε "κοιτάζω πίσω".
+    const rule = lookBackRuleActive();
+    const warn = c >= LOOK_BACK_CHARGE && rule;
+    // Όσο σέρνεις το δάχτυλο για ακύρωση, το δαχτυλίδι ξεθωριάζει και γίνεται διακεκομμένο.
+    const drag = Input.chargeDrag;
+    const fadeDrag = 1 - drag * 0.75;
+    if (drag > 0.2) ctx.setLineDash([3, 3]);
+    // Κανονικά στο χρώμα του πηλού· κόκκινο (έντονο, παλλόμενο) όταν στο V θα σήμαινε "κοιτάζω πίσω".
     const color = warn ? '255,40,30' : POT.light;
-    if (warn) ctx.lineWidth = 2.6 / scale;
-    ctx.strokeStyle = `rgba(${color},${((warn ? 0.55 : 0.2) + 0.35 * c * pulse).toFixed(3)})`;
+    ctx.lineWidth = (warn ? 2.6 + 1.2 * pulse : 1.5) / scale;
+    ctx.strokeStyle = `rgba(${color},${(((warn ? 0.6 : 0.2) + 0.35 * c * pulse) * fadeDrag).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(player.x, player.y, rr, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (warn) {
+      // Κόκκινη λάμψη γύρω του: προειδοποίηση.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(player.x, player.y, rr * 0.5, player.x, player.y, rr * 2.2);
+      g.addColorStop(0, `rgba(255,40,30,${(0.18 * pulse * fadeDrag).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,40,30,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, rr * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (rule) {
+      // Στο V: μια αχνή γραμμή δείχνει ως πού μπορείς να φορτίσεις χωρίς να κοιτάξεις πίσω.
+      ctx.strokeStyle = `rgba(255,60,40,${(0.35 * fadeDrag).toFixed(3)})`;
+      ctx.lineWidth = 1 / scale;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r + 4 + LOOK_BACK_CHARGE * 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Ακυρωμένο κύμα: το δαχτυλίδι μαζεύεται και σβήνει (δεν βγήκε κανένας ήχος).
+  const ct = (gameTime - cancelFx.t) / 0.35;
+  if (ct >= 0 && ct < 1) {
+    ctx.strokeStyle = `rgba(${POT.light},${(0.5 * (1 - ct)).toFixed(3)})`;
+    ctx.lineWidth = 1.2 / scale;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, Math.max(1, cancelFx.r * (1 - ct)), 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -396,6 +460,7 @@ function frame(t) {
     Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
     Echoes.update(dt, gameTime);
     Hints.update(gameTime);
+    updateLookBackWarning();
     Notice.update(gameTime);
 
     killer = monsters.find((m) => m.touches(player)) || null;
@@ -523,6 +588,7 @@ function stopInput() {
 
 function setState(s) {
   state = s;
+  if (s !== 'play' && warnOn) { warnOn = false; Sound.tension(false); }
   Sound.setAmbient(AMBIENT[s]);
 }
 
@@ -721,6 +787,7 @@ function init() {
 
   Input.now = () => gameTime;
   Input.onRelease = emitCall;
+  Input.onCancel = cancelCall;
   Input.init(canvas);
 
   for (const btn of document.querySelectorAll('[data-action]')) {

@@ -592,6 +592,70 @@ const Sound = {
     n.stop(t + 0.12);
   },
 
+  // Ακύρωση κύματος: ένα απαλό "φσσσ" που πέφτει — ο ήχος δεν βγήκε ποτέ.
+  cancel() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const n = this.noiseSource();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 2;
+    bp.frequency.setValueAtTime(1800, t);
+    bp.frequency.exponentialRampToValueAtTime(300, t + 0.25);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.06, 0.01, 0.25);
+    n.connect(bp);
+    bp.connect(g);
+    g.connect(this.sfx);
+    n.start(t, Math.random());
+    n.stop(t + 0.3);
+  },
+
+  // Ένταση στο κεφ. V όσο φορτίζεις πέρα από το όριο "κοιτάζω πίσω": ένα δυσαρμονικό
+  // βουητό (μικρή δεύτερη) που ανεβαίνει και δυναμώνει, μαζί με τρεμάμενο θόρυβο.
+  tension(on) {
+    if (!this.ctx) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (on) {
+      if (this._tension) return;
+      const out = ac.createGain();
+      out.gain.setValueAtTime(0.0001, t);
+      out.gain.exponentialRampToValueAtTime(0.22, t + 0.9);
+      out.connect(this.sfx);
+      out.connect(this.reverbSend);
+      const nodes = [];
+      for (const [f, type] of [[110, 'sawtooth'], [116.5, 'sawtooth'], [220, 'triangle']]) {
+        const o = ac.createOscillator();
+        o.type = type;
+        o.frequency.setValueAtTime(f, t);
+        o.frequency.exponentialRampToValueAtTime(f * 1.5, t + 2.5);   // ανεβαίνει όσο κρατάς
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 900;
+        o.connect(lp);
+        lp.connect(out);
+        o.start(t);
+        nodes.push(o);
+      }
+      // Τρέμουλο έντασης σαν γρήγορη ανάσα.
+      const lfo = ac.createOscillator();
+      lfo.frequency.value = 7;
+      const lg = ac.createGain();
+      lg.gain.value = 0.08;
+      lfo.connect(lg);
+      lg.connect(out.gain);
+      lfo.start(t);
+      nodes.push(lfo);
+      this._tension = { out, nodes };
+    } else if (this._tension) {
+      const { out, nodes } = this._tension;
+      this._tension = null;
+      out.gain.cancelScheduledValues(t);
+      out.gain.setTargetAtTime(0.0001, t, 0.08);
+      for (const n of nodes) n.stop(t + 0.5);
+    }
+  },
+
   // Ο Χάροντας δεν παίρνει τίποτα: χαμηλό, κούφιο μουρμουρητό.
   charonRefuse() {
     if (!this.ready()) return;

@@ -8,6 +8,9 @@ const JOY_DEADZONE = 0.12;
 const RUN_THRESHOLD = 0.6;
 // Μέγιστος χρόνος φόρτισης του κύματος (δευτ.).
 const MAX_CHARGE = 1.5;
+// Drag-to-cancel: αν σύρεις το δάχτυλο τόσο μακριά (CSS px) από εκεί που ξεκίνησε η
+// φόρτιση, το κύμα ακυρώνεται με ασφάλεια (δεν βγαίνει κανένας ήχος).
+const CANCEL_DRAG = 80;
 
 const Input = {
   keys: {},
@@ -23,6 +26,10 @@ const Input = {
   chargeStart: 0,
   chargeSource: null,   // 'key' ή pointerId
   onRelease: null,      // callback(heldSeconds)
+  onCancel: null,       // callback() όταν η φόρτιση ακυρώνεται με σύρσιμο (ή X στο PC)
+  chargeX: 0,           // πού ακούμπησε το δάχτυλο που φορτίζει
+  chargeY: 0,
+  chargeDrag: 0,        // 0..1: πόσο κοντά είναι το σύρσιμο στην ακύρωση
 
   // Η ώρα του παιχνιδιού έρχεται από το main loop ώστε η φόρτιση να μετράει σωστά.
   now: () => 0,
@@ -33,6 +40,8 @@ const Input = {
         e.preventDefault();
         if (!e.repeat) this.startCharge('key');
       }
+      // Στο PC: X ακυρώνει το κύμα που φορτίζει (αντίστοιχο του drag-to-cancel).
+      if (e.code === 'KeyX' && this.charging && this.chargeSource === 'key') this.dragCancel();
       this.keys[e.code] = true;
     });
     window.addEventListener('keyup', (e) => {
@@ -54,6 +63,8 @@ const Input = {
         this.joy.oy = this.joy.y = e.clientY;
       } else {
         this.startCharge(e.pointerId);
+        this.chargeX = e.clientX;
+        this.chargeY = e.clientY;
       }
       try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* δεν πειράζει */ }
     });
@@ -61,6 +72,11 @@ const Input = {
       if (e.pointerId === this.joy.id) {
         this.joy.x = e.clientX;
         this.joy.y = e.clientY;
+      }
+      if (this.charging && e.pointerId === this.chargeSource) {
+        const d = Math.hypot(e.clientX - this.chargeX, e.clientY - this.chargeY);
+        this.chargeDrag = Math.min(1, d / CANCEL_DRAG);
+        if (d >= CANCEL_DRAG) this.dragCancel();
       }
     });
     const up = (e) => {
@@ -74,6 +90,7 @@ const Input = {
 
   startCharge(source) {
     if (this.charging) return;
+    this.chargeDrag = 0;
     this.charging = true;
     this.chargeSource = source;
     this.chargeStart = this.now();
@@ -90,6 +107,15 @@ const Input = {
   cancelCharge() {
     this.charging = false;
     this.chargeSource = null;
+    this.chargeDrag = 0;
+  },
+
+  // Ακύρωση από τον παίκτη (σύρσιμο ή X): σβήνει τη φόρτιση και το λέει στο main.
+  dragCancel() {
+    if (!this.charging) return;
+    const amount = this.chargeAmount();
+    this.cancelCharge();
+    if (this.onCancel) this.onCancel(amount);
   },
 
   // 0..1: πόσο έχει φορτίσει το κύμα αυτή τη στιγμή.
