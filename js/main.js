@@ -137,8 +137,10 @@ function cancelCall(amount) {
   Sound.cancel();
 }
 
+let lastCallAt = -1e6;   // πότε έβγαλε ο παίκτης το τελευταίο κύμα (για το "παίζει λύρα")
 function emitCall(held) {
   if (state !== 'play') return;
+  lastCallAt = gameTime;
   const c = Math.min(1, held / MAX_CHARGE);
   Echoes.emit(player.x, player.y,
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
@@ -192,7 +194,7 @@ function playerRegion() {
 
 // Κοίταξες πίσω: ψίθυρος, και τα βήματά της σταματούν για πάντα.
 function lookBack() {
-  Eurydice.lose();
+  Eurydice.lose(gameTime);
   const d = Voice.say(STORY.whisper, 'eurydice', { x: Eurydice.x, y: Eurydice.y, fade: true });
   Notice.show(STORY.whisper, gameTime, Math.max(2.5, d + 0.6), { text: STORY.footstepsStop, time: 6 });
   Notice.el.classList.add('whisper');
@@ -311,6 +313,7 @@ function draw() {
   ExitDoor.draw(pc, gameTime);
   Items.draw(pc, gameTime, view);
   Eggs.draw(pc, gameTime, view);
+  Souls.drawSpirits(pc, gameTime, view);
   Charon.draw(pc, gameTime);
   Jars.draw(pc, gameTime);
   Melody.draw(pc, gameTime);
@@ -324,6 +327,7 @@ function draw() {
       m.draw(pc, gameTime);
     }
   }
+  drawEurydice();
   drawPlayer();
 
   pc.setTransform(1, 0, 0, 1, 0, 0);
@@ -411,11 +415,49 @@ function drawPlayer() {
   ctx.fill();
   ctx.restore();
 
-  // Ο Ορφέας ως μορφή αγγείου που περπατάει. Η λύρα φαίνεται στα χέρια του
-  // όταν ξαναγίνει ολόκληρη.
-  const h = player.r * 5;   // ~15 art pixels ύψος: διαβάζεται καθαρά
-  Pottery.orpheus(ctx, player.x, player.y + h * 0.5, h, 0.88 + 0.12 * c, strings >= 3, player.dir,
-    { phase: player.walkPhase, speed: player.walkSpeed, t: gameTime });
+  // Ο Ορφέας ως pixel sprite (js/sprites.js): στέκεται, περπατάει αργά, τρέχει, ή παίζει
+  // τη λύρα όσο φορτίζει κύμα (και για λίγο αφού το αφήσει). Στη λύρα φαίνονται όσες
+  // χορδές έχει βρει.
+  let anim = 'idle', frame = Math.floor(gameTime * 1.6);
+  if (Input.charging || gameTime - lastCallAt < 0.35) {
+    anim = 'play';
+    frame = Math.floor(gameTime * 8);
+  } else if (player.walkSpeed > 0.15) {
+    anim = player.walkSpeed > 0.75 ? 'run' : 'walk';
+    frame = Math.floor(player.walkPhase / (Math.PI / 2));
+  }
+  Sprites.draw(ctx, `orpheus_${anim}_${strings}`, frame, player.x, player.y, { flip: player.dir < 0, center: true });
+}
+
+// Η Ευρυδίκη στο V: χλωμό, διάφανο φάσμα λίγα βήματα πίσω του, με απαλή λάμψη γύρω της.
+// Όταν κοιτάξει πίσω, σβήνει και ανεβαίνει σαν καπνός.
+function drawEurydice() {
+  const e = Eurydice;
+  let a = 0, rise = 0;
+  if (e.state === 'following') {
+    a = 0.74 + 0.08 * Math.sin(gameTime * 2.3);
+  } else if (e.state === 'lost') {
+    const t = (gameTime - e.lostAt) / EURY_VANISH;
+    if (t >= 1 || t < 0) return;
+    a = 0.78 * (1 - t);
+    rise = t * 14;
+  } else {
+    return;
+  }
+  const x = e.x, y = e.y - rise;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const R = 26;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, `rgba(${POT.cream},${(a * 0.3).toFixed(3)})`);
+  g.addColorStop(1, `rgba(${POT.cream},0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  Sprites.draw(ctx, 'eurydice', e.moving ? Math.floor(e.walked / 12) : 1, x, y,
+    { flip: e.dir < 0, alpha: a, center: true });
 }
 
 function drawJoystick() {
@@ -864,6 +906,7 @@ function init() {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   Pixel.init();
+  Sprites.init();
   resize();
   showScreen('menu');
   requestAnimationFrame(frame);

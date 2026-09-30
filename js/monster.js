@@ -36,6 +36,7 @@ class Monster {
     this.revealTime = -1e6;
     this.revealStrength = 0;
     this.revealSeed = 0;
+    this.revealState = 'wander';   // τι έκανε όταν φάνηκε (για το εικονίδιο πάνω από το κεφάλι)
 
     // Η Μελωδία την παγώνει: δεν κινείται, δεν ακούει, δεν σκοτώνει.
     this.frozenUntil = -1e6;
@@ -53,6 +54,14 @@ class Monster {
   onHear(wave, d, los) {
     const now = Echoes.now;
     if (this.isFrozen()) return;
+    const revealed = this.hear(wave, d, los, now);
+    // Το εικονίδιο δείχνει τι κάνει ΑΦΟΥ άκουσε (π.χ. μόλις ξεκίνησε να κυνηγάει).
+    if (revealed) this.revealState = this.state;
+  }
+
+  // Επιστρέφει true αν το κύμα την έκανε να φανεί.
+  hear(wave, d, los, now) {
+    let revealed = false;
     if (los) {
       const s = Math.min(1, 0.3 + Echoes.strengthAt(wave, d) * 1.2);
       if (s > this.revealAlpha(now)) {
@@ -61,19 +70,21 @@ class Monster {
         this.revealTime = now;
         this.revealStrength = s;
         this.revealSeed = Math.random() * 1000;
+        revealed = true;
       }
     }
 
     const range = los ? wave.radius : wave.radius * MONSTER_MUFFLED_RANGE;
-    if (d > range) return;
+    if (d > range) return revealed;
     // Ήχοι από άλλο κεφάλαιο δεν την τραβάνε έξω από το δικό της.
-    if (Level.regionAt(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE)) !== this.region) return;
+    if (Level.regionAt(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE)) !== this.region) return revealed;
 
     if (this.state !== 'hunt' && this.onSense) this.onSense(this);
     this.state = 'hunt';
     this.soundX = wave.x;
     this.soundY = wave.y;
     this.goTo(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE));
+    return revealed;
   }
 
   revealAlpha(now) {
@@ -142,41 +153,58 @@ class Monster {
     return Math.hypot(p.x - this.x, p.y - this.y) < p.r + this.r;
   }
 
-  // Κόκκινη λάμψη. Αν δοθεί forceAlpha, σχεδιάζεται στην πραγματική θέση (π.χ. Game Over).
+  // Η σκιά ως pixel sprite: σκυφτή μορφή από κάρβουνο με λευκά μάτια που λάμπουν,
+  // "φωτισμένη" από το κύμα (περίγραμμα πηλού). Αν δοθεί forceAlpha, σχεδιάζεται στην
+  // πραγματική θέση (π.χ. εκεί που σε έπιασε).
   draw(ctx, now, forceAlpha) {
     if (forceAlpha === undefined && now < this.frozenUntil) {
       this.drawRemembering(ctx, now);
       return;
     }
-    let a, x, y, seed;
+    let a, x, y, frame;
     if (forceAlpha !== undefined) {
-      a = forceAlpha; x = this.x; y = this.y; seed = now * 3;
+      a = forceAlpha; x = this.x; y = this.y; frame = Math.floor(now * 5);
     } else {
       a = this.revealAlpha(now);
       if (a < 0.01) return;
-      x = this.revealX; y = this.revealY; seed = this.revealSeed;
+      x = this.revealX; y = this.revealY; frame = Math.floor(this.revealSeed);
     }
 
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, this.r * 3);
-    glow.addColorStop(0, `rgba(${POT.red},${(a * 0.5).toFixed(3)})`);
+    // Αχνή κόκκινη λάμψη γύρω της: κίνδυνος.
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, this.r * 2.8);
+    glow.addColorStop(0, `rgba(${POT.red},${(a * 0.4).toFixed(3)})`);
     glow.addColorStop(1, `rgba(${POT.red},0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
+    ctx.arc(x, y, this.r * 2.8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Σιλουέτα σκιάς σε στυλ αγγείου (js/pottery.js), κάθε φορά λίγο διαφορετική.
     // Κοιτάζει προς τον παίκτη, όπως ήταν τη στιγμή που φάνηκε.
-    const dir = (typeof player !== 'undefined' && player.x < x) ? -1 : 1;
+    const flip = typeof player !== 'undefined' && player.x < x;
+    const r = Sprites.draw(ctx, 'shade', frame, x, y, { flip, alpha: a, center: true });
+
+    // Τα μάτια λάμπουν (λευκή λάμψη πάνω στα δύο pixels των ματιών).
+    const ex = r.x + (flip ? r.w - 9.5 : 9.5), ey = r.y + 3.5;
     ctx.save();
-    ctx.translate(x, y + this.r * 1.2);
-    ctx.scale(dir, 1);
-    Pottery.shade(ctx, 0, 0, this.r * 3.4, a, seed, now);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, 4);
+    eg.addColorStop(0, `rgba(255,250,235,${(a * 0.45).toFixed(3)})`);
+    eg.addColorStop(1, 'rgba(255,250,235,0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(ex - 4, ey - 4, 8, 8);
     ctx.restore();
+
+    // Πάνω από το κεφάλι: τι κάνει. ((•)) = κυνηγάει έναν ήχο, ? = ψάχνει.
+    if (forceAlpha === undefined && this.revealState !== 'wander') {
+      const icon = this.revealState === 'hunt' ? 'iconHear' : 'iconSearch';
+      const blink = 0.65 + 0.35 * Math.sin(now * 10);
+      Sprites.blit(ctx, icon, 0, r.x + r.w / 2, r.y - 2, { alpha: a * blink });
+    }
   }
 
-  // Παγωμένη από τη Μελωδία: φαίνεται ως χλωμή, ήρεμη ανθρώπινη μορφή
-  // ("θυμάται ότι κάποτε ζούσε"), που σβήνει καθώς τελειώνει το πάγωμα.
+  // Παγωμένη από τη Μελωδία: φαίνεται ως χλωμό, ήρεμο πνεύμα ("θυμάται ότι κάποτε
+  // ζούσε"), που σβήνει καθώς τελειώνει το πάγωμα.
   drawRemembering(ctx, now) {
     const left = this.frozenUntil - now;
     const a = Math.min(1, left / 1.2) * (0.55 + 0.1 * Math.sin(now * 3));
@@ -188,7 +216,6 @@ class Monster {
     ctx.beginPath();
     ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
     ctx.fill();
-    // Σε "πρόσθετο λευκό", όρθια και ήρεμη — όπως ήταν όσο ζούσε.
-    Pottery.woman(ctx, x, y + this.r * 1.1, this.r * 2.4, a);
+    Sprites.draw(ctx, 'soul', Math.floor(now * 2), x, y, { alpha: a, center: true });
   }
 }

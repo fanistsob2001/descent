@@ -105,7 +105,7 @@ const Eggs = {
       if (a > 0.01) {
         // Φαίνεται εκεί που είναι τώρα (όχι "παγωμένη" όπως οι αληθινές σκιές),
         // για να τη δεις να χτυπάει ξανά και ξανά.
-        Pottery.shade(ctx, s.x, s.y + MONSTER_RADIUS * 1.2, MONSTER_RADIUS * 3.4, a * 0.9, 3.1, now);
+        Sprites.draw(ctx, 'shade', Math.floor(now * 4), s.x, s.y, { alpha: a * 0.9, center: true });
         // Μικρές γραμμές "μπαμ" πάνω στον τοίχο, αμέσως μετά το χτύπημα.
         const hit = 1 - (now - s.bumpAt) / 0.35;
         if (hit > 0) {

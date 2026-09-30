@@ -43,48 +43,55 @@ const Cutscene = {
     this.showNext();
   },
 
-  // Μια σκηνή σαν ζωφόρος αγγείου: μορφές σε σιλουέτα πάνω από έναν μαίανδρο.
+  // Μια μικρή σκηνή με τα pixel sprites των χαρακτήρων (js/sprites.js), σε διπλό
+  // μέγεθος, πάνω από έναν μαίανδρο. Ζωγραφίζεται σε μισή ανάλυση και το CSS τη
+  // μεγαλώνει με καθαρά τετράγωνα pixels (image-rendering: pixelated).
   drawArt(art) {
     const cv = document.getElementById('cut-art');
-    // Pixel art: ζωγραφίζεται σε μισή ανάλυση και το CSS τη μεγαλώνει με καθαρά
-    // τετράγωνα pixels (image-rendering: pixelated).
-    const w = 300, h = 118, k = 0.5;
-    cv.width = w * k;
-    cv.height = h * k;
+    const W = 150, H = 59, K = 2;   // art pixels, και πόσο μεγαλώνουν τα sprites
+    cv.width = W;
+    cv.height = H;
     const c = cv.getContext('2d');
-    c.setTransform(k, 0, 0, k, 0, 0);
-    c.clearRect(0, 0, w, h);
-    const ground = h - 18, s = 84;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, W, H);
+    const ground = 51;
+    const put = (name, i, x, opts = {}) => Sprites.blit(c, name, i, x, ground, { scale: K, ...opts });
+    // Η Ευρυδίκη: χλωμό φάσμα με απαλή λάμψη γύρω της.
+    const ghost = (x, a, i) => {
+      const g = c.createRadialGradient(x, ground - 18, 2, x, ground - 18, 26);
+      g.addColorStop(0, Pottery.rgba(POT.cream, 0.35 * a));
+      g.addColorStop(1, Pottery.rgba(POT.cream, 0));
+      c.fillStyle = g;
+      c.fillRect(x - 26, ground - 44, 52, 52);
+      put('eurydice', i, x, { alpha: a });
+    };
     if (art === 'intro') {
-      // Ο Ορφέας με τη λύρα, και το φίδι στο χορτάρι.
-      Pottery.orpheus(c, w / 2 - 10, ground, s, 1, true);
-      c.strokeStyle = Pottery.rgba(POT.terra, 1);
-      c.lineWidth = 2.2;
-      c.lineCap = 'round';
-      c.beginPath();
-      c.moveTo(w / 2 + 40, ground - 3);
-      for (let i = 1; i <= 8; i++) c.lineTo(w / 2 + 40 + i * 6, ground - 3 - Math.sin(i * 1.3) * 4);
-      c.stroke();
+      // Ο Ορφέας με τη λύρα, και το φίδι στο χορτάρι που σηκώνει το κεφάλι.
+      put('orpheus_idle_3', 0, 52);
+      put('snake', 1, 104, { flip: true });
+      put('grass', 0, 104);
     } else if (art === 'middle') {
-      // Ο Ορφέας παίζει μπροστά στον Άδη και την Περσεφόνη.
-      Pottery.orpheus(c, 70, ground, s, 1, true);
-      Pottery.seated(c, 190, ground, s, 1, -1, POT.terra, true);
-      Pottery.seated(c, 250, ground, s, 1, -1, POT.cream, false);
+      // Ο Ορφέας παίζει μπροστά στον Άδη· η Περσεφόνη γέρνει προς το μέρος του.
+      put('orpheus_play_3', 0, 22);
+      put('hound', 0, 58);
+      put('hades', 0, 88);
+      put('persephone', 1, 126);
     } else if (art === 'good') {
       // Βγαίνουν στο φως: εκείνος μπροστά, εκείνη πίσω του. Ο ήλιος δεξιά.
-      const sun = c.createRadialGradient(w - 62, 56, 4, w - 62, 56, 52);
+      const sun = c.createRadialGradient(W - 31, 28, 2, W - 31, 28, 26);
       sun.addColorStop(0, Pottery.rgba(POT.cream, 0.9));
       sun.addColorStop(1, Pottery.rgba(POT.light, 0));
       c.fillStyle = sun;
-      c.fillRect(0, 0, w, h);
-      Pottery.woman(c, 110, ground, s, 1, 1);
-      Pottery.orpheus(c, 170, ground, s, 1, true);
+      c.fillRect(0, 0, W, H);
+      ghost(58, 1, 0);
+      put('orpheus_walk_3', 0, 90);
     } else if (art === 'bad') {
       // Γύρισε: την κοιτάζει, κι εκείνη σβήνει στο σκοτάδι.
-      Pottery.woman(c, 115, ground, s, 0.28, 1);
-      Pottery.orpheus(c, 180, ground, s, 1, true, -1);
+      ghost(58, 0.3, 1);
+      put('orpheus_idle_3', 0, 90, { flip: true });
     }
-    Pottery.meander(c, 20, h - 14, w - 40, 12, POT.terra, 0.9, 1.3);
+    c.setTransform(0.5, 0, 0, 0.5, 0, 0);
+    Pottery.meander(c, 20, 118 - 14, 260, 12, POT.terra, 0.9, 1.3);
   },
 
   showNext() {

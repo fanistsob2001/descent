@@ -1,11 +1,13 @@
 'use strict';
 
 // Μηνύματα χαμένων ψυχών (STORY.md, ενότητα 8): κρυμμένα στον χάρτη, φαίνονται
-// μόνο όταν τα ακουμπήσει κύμα — σαν χαραγμένα λόγια που αναδύονται στο σκοτάδι.
+// μόνο όταν τα ακουμπήσει κύμα — ένα μικρό φωτεινό πνεύμα (pixel sprite) και από
+// πάνω του τα λόγια του, που αναδύονται στο σκοτάδι.
 const SOUL_HOLD = 5;          // πόσα δευτ. μένει καθαρό μετά το κύμα
 const SOUL_FADE = 1.5;        // και μετά σβήνει σε τόσο
 const SOUL_FONT = 14;         // μέγεθος γραμμάτων σε μονάδες κόσμου (~12px σε κινητό)
 const SOUL_WIDTH = 210;       // πλάτος γραμμής πριν αλλάξει σειρά
+const SOUL_ABOVE = 34;        // πόσο πάνω από το πνεύμα είναι η τελευταία γραμμή
 
 const Souls = {
   list: [],   // { n, x, y, lines, revealTime, onHear }
@@ -52,6 +54,28 @@ const Souls = {
     return lines;
   },
 
+  // Τα πνεύματα, στον μικρό καμβά του pixel art (τα λόγια ζωγραφίζονται μετά, από πάνω).
+  drawSpirits(ctx, now, view) {
+    for (const s of this.list) {
+      if (s.x < view.x0 - TILE || s.x > view.x1 + TILE || s.y < view.y0 - TILE || s.y > view.y1 + TILE) continue;
+      const a = this.alpha(s, now);
+      if (a < 0.01) continue;
+      const bob = Math.sin(now * 2 + s.n) * 2;
+      const R = 24;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(s.x, s.y + bob, 0, s.x, s.y + bob, R);
+      g.addColorStop(0, `rgba(${POT.cream},${(a * 0.3).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${POT.cream},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y + bob, R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      Sprites.draw(ctx, 'soul', Math.floor(now * 2 + s.n), s.x, s.y + bob, { alpha: a * 0.9, center: true });
+    }
+  },
+
   draw(ctx, now, view) {
     ctx.font = `italic ${SOUL_FONT}px Georgia, 'Times New Roman', serif`;
     ctx.textAlign = 'center';
@@ -64,7 +88,8 @@ const Souls = {
       if (!s.lines) s.lines = this.wrap(ctx, STORY.souls[s.n - 1]);
 
       const lh = SOUL_FONT * 1.35;
-      const top = s.y - ((s.lines.length - 1) * lh) / 2;
+      // Τα λόγια πάνω από το πνεύμα.
+      const top = s.y - SOUL_ABOVE - (s.lines.length - 1) * lh;
       // Σκοτεινό "φόντο" ώστε να διαβάζεται πάνω από τους φωτισμένους τοίχους.
       ctx.fillStyle = `rgba(0,0,0,${(a * 0.7).toFixed(3)})`;
       ctx.fillRect(s.x - SOUL_WIDTH / 2 - 6, top - lh / 2 - 4, SOUL_WIDTH + 12, s.lines.length * lh + 8);

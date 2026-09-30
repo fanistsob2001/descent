@@ -28,8 +28,10 @@ const Charon = {
     Level.setGate(this.gate, paid);
   },
 
-  onHear(wave, d, los) {
-    if (!los) return;
+  onHear(wave, d) {
+    // Στέκεται πάνω στην κλειστή πύλη (που σταματάει τον ήχο), οπότε η οπτική επαφή
+    // ελέγχεται ως την άκρη της προβλήτας, λίγο πιο πάνω.
+    if (!Level.lineOfSight(wave.x, wave.y, this.x, this.y - TILE * 0.6)) return;
     const s = Echoes.strengthAt(wave, d);
     const left = this.revealStrength * Math.max(0, 1 - (Echoes.now - this.revealTime) / CHARON_REVEAL_TIME);
     if (s < left) return;
@@ -67,57 +69,12 @@ const Charon = {
     if (this.paid) a = Math.max(a * (1 - leave), (1 - leave) * 0.6);
     if (a < 0.01) return;
 
-    // Σε στυλ αγγείου: μορφή από πηλό με χαραγμένες μαύρες λεπτομέρειες.
+    // Pixel sprite: ηλιοκαμένος γέρος βαρκάρης με κουπί, όρθιος στη βάρκα του (που έχει
+    // "μάτι" στην πλώρη, όπως τα πλοία των αγγείων). Όσο περιμένει τον οβολό, απλώνει
+    // την παλάμη. Κοιτάζει προς τον παίκτη.
     const x = this.x, y = this.y + leave * TILE * 0.8;
-    const terra = Pottery.rgba(POT.terra, a), light = Pottery.rgba(POT.light, a);
-
-    // Βάρκα: μαύρο κύτος με περίγραμμα πηλού και ένα "μάτι" στην πλώρη,
-    // όπως στα πλοία που ζωγράφιζαν στα αγγεία.
-    ctx.beginPath();
-    ctx.moveTo(x - 18, y + 1);
-    ctx.quadraticCurveTo(x, y + 13, x + 16, y + 3);
-    ctx.lineTo(x + 20, y - 2);
-    ctx.lineTo(x + 14, y + 2);
-    ctx.quadraticCurveTo(x, y + 6, x - 18, y + 1);
-    ctx.fillStyle = Pottery.rgba(POT.black, a);
-    ctx.fill();
-    ctx.strokeStyle = terra;
-    ctx.lineWidth = 1.3;
-    ctx.stroke();
-    ctx.fillStyle = light;
-    ctx.beginPath();
-    ctx.arc(x + 12, y + 4, 1.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Ο Χάροντας: ψηλή σκυμμένη μορφή με κουκούλα.
-    ctx.beginPath();
-    ctx.moveTo(x - 6, y + 4);
-    ctx.lineTo(x - 4, y - 8);
-    ctx.quadraticCurveTo(x - 2, y - 15, x + 3, y - 13);
-    ctx.lineTo(x + 2, y - 9);
-    ctx.lineTo(x + 5, y + 4);
-    ctx.closePath();
-    ctx.fillStyle = terra;
-    ctx.fill();
-    Pottery.incise(ctx, [x - 3, y - 7, x - 2, y + 3], 20);
-    Pottery.incise(ctx, [x + 1, y - 6, x + 2, y + 3], 20);
-
-    // Κοντάρι.
-    ctx.strokeStyle = light;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(x + 9, y - 16);
-    ctx.lineTo(x + 6, y + 9);
-    ctx.stroke();
-
-    // Το απλωμένο χέρι, όσο περιμένει πληρωμή.
-    if (!this.paid) {
-      ctx.strokeStyle = terra;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(x - 2, y - 6);
-      ctx.lineTo(x - 10, y - 8);
-      ctx.stroke();
-    }
+    const flip = typeof player !== 'undefined' && player.x < x;
+    Sprites.draw(ctx, 'charon', this.paid ? 0 : 1, x, y + 8, { flip, alpha: a });
+    Sprites.draw(ctx, 'boat', 0, x, y + 13, { flip, alpha: a });
   },
 };
