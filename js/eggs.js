@@ -41,7 +41,8 @@ const Eggs = {
           this.revealTime = Echoes.now;
           if (Echoes.now - this.spokeAt > STUCK_TALK_GAP) {
             this.spokeAt = Echoes.now;
-            Notice.show(STORY.stuckShade, Echoes.now, 6);
+            const d = Voice.say(STORY.stuckShade, 'shade', { x: this.x, y: this.y });
+            Notice.show(STORY.stuckShade, Echoes.now, Math.max(6, d + 1), null, 'shade');
           }
         },
       };

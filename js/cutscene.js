@@ -29,8 +29,10 @@ const Cutscene = {
 
   // style: '' | 'good' | 'bad' (λίγο διαφορετικό φόντο για τα τέλη)
   // art: 'intro' | 'middle' | 'good' | 'bad' — η μικρή "ζωγραφιά αγγείου" από πάνω
-  play(lines, style, onEnd, art) {
+  // who: ποιος λέει κάθε γραμμή (π.χ. STORY.middleWho) — βλ. js/voice.js.
+  play(lines, style, onEnd, art, who) {
     this.lines = lines;
+    this.who = who || [];
     this.shown = 0;
     this.onEnd = onEnd;
     this.active = true;
@@ -92,7 +94,9 @@ const Cutscene = {
     requestAnimationFrame(() => p.classList.add('in'));
     this.shown++;
     this.el.classList.toggle('last', this.shown >= this.lines.length);
-    Sound.cutLine(this.shown - 1);
+    // Η προηγούμενη φωνή σταματάει αν πατήσεις "επόμενη" πριν τελειώσει.
+    Voice.stop();
+    Voice.say(this.lines[this.shown - 1], this.who[this.shown - 1] || 'narrator');
   },
 
   advance() {
@@ -106,6 +110,7 @@ const Cutscene = {
 
   finish() {
     if (!this.active) return;
+    Voice.stop();
     this.active = false;
     this.el.classList.add('hidden');
     const cb = this.onEnd;

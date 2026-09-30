@@ -1,8 +1,9 @@
 'use strict';
 
-// Όλα τα κείμενα της ιστορίας, ΑΚΡΙΒΩΣ όπως στο STORY.md (ενότητα 8).
+// Όλα τα κείμενα της ιστορίας, ΑΚΡΙΒΩΣ όπως στο STORY.md (ενότητες 8, 9 και 10).
 // Βγήκαν αυτόματα από το STORY.md· αν αλλάξει εκεί, άλλαξέ τα κι εδώ ίδια.
 // (Οι τίτλοι, οι φράσεις και οι στόχοι των κεφαλαίων είναι στο js/levels.js.)
+// Τα *Who δίνουν ποιος μιλάει σε κάθε γραμμή: 'narrator' | 'hades' | 'eurydice'.
 const STORY = {
   intro: [
     "A snake in the grass. A single bite.",
@@ -15,6 +16,7 @@ const STORY = {
     "There is no light down here.",
     "Only what can be heard.",
   ],
+  introWho: ["narrator", "narrator", "narrator", "narrator", "narrator", "narrator", "narrator", "narrator", "narrator"],
 
   middle: [
     "Orpheus played.",
@@ -24,15 +26,17 @@ const STORY = {
     "But if you turn to look at her before you leave,",
     "she stays here. Forever.\"",
   ],
+  middleWho: ["narrator", "narrator", "narrator", "hades", "hades", "hades"],
 
   good: [
     "Light.",
     "Orpheus stepped into the open air and did not turn. He waited.",
     "A hand touched his shoulder.",
-    "\"You didn't look,\" said Eurydice.",
+    "You didn't look...",
     "In the myth, he looked.",
     "You didn't.",
   ],
+  goodWho: ["narrator", "narrator", "narrator", "eurydice", "narrator", "narrator"],
 
   bad: [
     "Orpheus turned.",
@@ -41,6 +45,7 @@ const STORY = {
     "He stepped into the light alone.",
     "Just like in the myth.",
   ],
+  badWho: ["narrator", "narrator", "narrator", "narrator", "narrator"],
 
   // Μηνύματα χαμένων ψυχών: souls[0] είναι το 1 κ.λπ.
   souls: [
@@ -53,13 +58,18 @@ const STORY = {
   ],
 
   checkpoint: "The flame is lit. Your progress is saved.",
-  charonEmpty: "Charon holds out his hand. Yours is empty.",
-  charonPaid: "The obol clinks into his palm. The boat begins to move.",
+  charonEmpty: "The ferryman takes no one for free. Show me the coin, living one.",
+  charonPaid: "The river claims your coin. Step aboard...",
   jar: "A libation jar. The dead hunger for offerings. Throw it, and they will come.",
   string: (x) => "You found a string " + `(${x}/3)` + ".",
   lyreWhole: "Your lyre is whole again. When you play, the shades remember they were once alive.",
   whisper: "Orpheus...",
   footstepsStop: "The footsteps behind you stop.",
+  eurydiceFollow: "Orpheus... I am right behind you.",
+  shadeLines: [
+    "Who is there?",
+    "I hear life...",
+  ],
 
   // Easter eggs (STORY.md, ενότητα 9).
   stuckShade: "I have been walking into this wall for three thousand years.",

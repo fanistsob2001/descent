@@ -69,6 +69,7 @@ class Monster {
     // Ήχοι από άλλο κεφάλαιο δεν την τραβάνε έξω από το δικό της.
     if (Level.regionAt(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE)) !== this.region) return;
 
+    if (this.state !== 'hunt' && this.onSense) this.onSense(this);
     this.state = 'hunt';
     this.soundX = wave.x;
     this.soundY = wave.y;

@@ -17,6 +17,8 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 ## 2. Structure
 
 - **One continuous map** instead of 5 separate levels, split into **5 chapters**.
+- **Organic linear flow, NOT a maze:** a continuous, atmospheric downward descent through open chambers, corridors, ruins and bridges. No complex mazes, no stressful dead ends. The challenge is avoiding the shades (stealth) and timing, not finding the way.
+- Small, **optional side rooms** hold the collectibles (lyre strings) and the lost soul inscriptions.
 - Keep the existing difficulty ramp: tutorial → 1 shade → decoy introduced → 2 shades → hardest.
 - At the start of each chapter there is a **checkpoint**: an altar with an unlit flame.
   - Reaching it lights the flame and saves progress.
@@ -43,17 +45,19 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 
 ## 5. Chapter V rule: "Don't look back"
 
-- Eurydice follows the player. Soft footsteps are heard behind the player.
+- Eurydice follows the player. Soft footsteps are heard behind the player, and now and then she whispers "Orpheus... I am right behind you."
 - Small waves are allowed. A **big wave** (charging past a threshold) means "looking back".
-- While charging in chapter V, the charge indicator turns red past that threshold as a warning.
-- If the player releases a big wave: a whisper "Orpheus...", then the text "The footsteps behind you stop." Her footsteps stop for good. The player continues alone, and this leads to the bad ending.
+- While charging in chapter V, the charge indicator turns red past that threshold as a warning, with a warning vibration pulse and rising tension audio.
+- **Drag-to-cancel:** the player can drag the finger away (while holding) to cancel a charged wave safely without releasing it. This works in every chapter.
+- If the player releases a big wave: a whisper "Orpheus..." that fades away into silence, then the text "The footsteps behind you stop." Her footsteps stop for good. The player continues alone, and this leads to the bad ending.
 - Reaching the exit without a big wave in chapter V leads to the good ending.
 - After the bad ending, offer: "Try again from the last checkpoint" and "Main menu".
 
 ## 6. Art direction
 
-- Style inspired by **ancient Greek black-figure pottery**: black background, terracotta/orange lines, meander (Greek key) patterns as borders and decoration.
-- Waves reveal walls as terracotta lines, as if uncovering a painted vase.
+- **Retro 8-bit / pixel art combined with ancient Greek pottery**: black background, terracotta/orange outlines, dark clay floor tiles, meander (Greek key) patterns as borders and decoration.
+- Waves reveal walls as terracotta lines (and the clay floor tiles), as if uncovering a painted vase.
+- Smooth camera follow, subtle screen shake on jump scares. Works in portrait and landscape.
 - Characters (Orpheus, shades, Charon, Eurydice) are drawn as simple silhouettes in the same style.
 - The jump scare face is a shade drawn in the same pottery style.
 
@@ -62,6 +66,7 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 - **Main menu:** New Game, Continue (from last checkpoint, only if a save exists), Settings (sound on/off, vibration on/off). One save slot only.
 - **Cutscenes:** text lines fade in one at a time on a black screen, with subtle sound. Tap/click to advance, with a Skip button.
 - Cutscenes: Intro (on New Game), Middle (end of chapter IV), Good ending, Bad ending.
+- **All characters have voices** (see section 10), always with subtitles.
 
 ---
 
@@ -107,12 +112,14 @@ Objective otherwise: Your lyre is still broken. You climb without its song.
 (X is always the real number of strings the player has collected.)
 
 ### Item and event messages
-- At Charon without obol: Charon holds out his hand. Yours is empty.
-- At Charon with obol: The obol clinks into his palm. The boat begins to move.
+- At Charon without obol: The ferryman takes no one for free. Show me the coin, living one.
+- At Charon with obol: The river claims your coin. Step aboard...
 - Picking up a libation jar: A libation jar. The dead hunger for offerings. Throw it, and they will come.
 - Picking up a string (1st and 2nd): You found a string (X/3).
 - Picking up the 3rd string: Your lyre is whole again. When you play, the shades remember they were once alive.
 - Big wave in chapter V: (whisper) Orpheus... then: The footsteps behind you stop.
+- Eurydice following in chapter V (soft whisper, now and then): Orpheus... I am right behind you.
+- Shades, when they sense a sound wave (distorted whisper, one of): Who is there? | I hear life...
 
 ### Messages from lost souls
 Hidden on the map, visible only when a wave touches them. Placement: 1 in chapter I, 2 in II, 3 and 4 in III, 5 in IV, 6 in V.
@@ -135,7 +142,7 @@ she stays here. Forever."
 Light.
 Orpheus stepped into the open air and did not turn. He waited.
 A hand touched his shoulder.
-"You didn't look," said Eurydice.
+You didn't look...
 In the myth, he looked.
 You didn't.
 
@@ -162,3 +169,20 @@ Rule: easter eggs are hidden and harmless. Never in chapter V, cutscenes or endi
 - When a wave touches it, it barks three times, each head at a different pitch (low, middle, high).
 - Show: Good boy. Good boy. Good boy.
 - The barks do NOT attract shades. Cerberus never moves and cannot hurt the player.
+
+---
+
+## 10. Voices
+
+Every line of dialogue is voiced, always with subtitles. Voices are synthesized chiptune voices (no audio files): each character "speaks" in 8-bit syllables with its own timbre, in sync with the subtitle.
+
+| Speaker | Voice | Lines |
+|---|---|---|
+| Narrator | warm, calm | Intro cutscene; the narration lines of the middle cutscene and of both endings |
+| Charon | very deep, slow, gravelly | Both Charon lines |
+| Hades | deep, heavy | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
+| Eurydice | soft, high, breathy whisper | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) · Good ending: "You didn't look..." |
+| Shades | distorted, eerie whisper/moan, from where the shade is | "Who is there?" · "I hear life..." |
+| Lost souls | whispered, from where the inscription is | Each inscription is spoken when a wave touches it |
+
+Persephone has no spoken line: in the middle cutscene she is only described by the narrator.

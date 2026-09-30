@@ -134,6 +134,20 @@ function emitCall(held) {
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
 }
 
+// Μια σκιά μόλις άκουσε κάτι: ψιθυρίζει (STORY.md, ενότητα 10) — αν είναι αρκετά
+// κοντά για να την ακούσεις, και όχι συνέχεια (κάθε σκιά το πολύ κάθε 9 δευτ.,
+// και καμία αν μιλάει ήδη άλλη).
+let lastShadeVoice = -1e6;
+function shadeSpeaks(m) {
+  if (state !== 'play') return;
+  if (Math.hypot(m.x - player.x, m.y - player.y) > 460) return;
+  if (gameTime - (m.spokeAt || -1e6) < 9 || gameTime - lastShadeVoice < 3.5) return;
+  m.spokeAt = lastShadeVoice = gameTime;
+  const line = STORY.shadeLines[Math.floor(Math.random() * STORY.shadeLines.length)];
+  const d = Voice.say(line, 'shade', { x: m.x, y: m.y });
+  if (!Notice.busy(gameTime)) Notice.show(line, gameTime, d + 1, null, 'shade');
+}
+
 // Ο κανόνας "μην κοιτάξεις πίσω" ισχύει όσο η Ευρυδίκη ακολουθεί, μέσα στο κεφάλαιο V.
 function lookBackRuleActive() {
   return Eurydice.following() && playerRegion() === CHAPTERS.length - 1;
@@ -146,8 +160,8 @@ function playerRegion() {
 // Κοίταξες πίσω: ψίθυρος, και τα βήματά της σταματούν για πάντα.
 function lookBack() {
   Eurydice.lose();
-  Sound.whisper();
-  Notice.show(STORY.whisper, gameTime, 2.5, { text: STORY.footstepsStop, time: 6 });
+  const d = Voice.say(STORY.whisper, 'eurydice', { x: Eurydice.x, y: Eurydice.y, fade: true });
+  Notice.show(STORY.whisper, gameTime, Math.max(2.5, d + 0.6), { text: STORY.footstepsStop, time: 6 });
   Notice.el.classList.add('whisper');
 }
 
@@ -197,11 +211,12 @@ function pickUp(it) {
 function checkCharon() {
   const r = Charon.check(player, hasObol, gameTime);
   if (r === 'empty') {
-    Notice.show(STORY.charonEmpty, gameTime, 5);
-    Sound.charonRefuse();
+    const d = Voice.say(STORY.charonEmpty, 'charon', { x: Charon.x, y: Charon.y });
+    Notice.show(STORY.charonEmpty, gameTime, Math.max(5, d + 1), null, 'charon');
   } else if (r === 'paid') {
     hasObol = false;
-    Notice.show(STORY.charonPaid, gameTime, 6);
+    const d = Voice.say(STORY.charonPaid, 'charon', { x: Charon.x, y: Charon.y, delay: 0.5 });
+    Notice.show(STORY.charonPaid, gameTime, Math.max(6, d + 1.5), null, 'charon');
     Sound.charonPaid();
   }
 }
@@ -395,6 +410,10 @@ function frame(t) {
     const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
     if (region !== hudRegion) updateHud();
     Eurydice.update(player);
+    if (Eurydice.wantsToSpeak(gameTime) && lookBackRuleActive() && !Notice.busy(gameTime)) {
+      const d = Voice.say(STORY.eurydiceFollow, 'eurydice', { x: Eurydice.x, y: Eurydice.y });
+      Notice.show(STORY.eurydiceFollow, gameTime, d + 1.2, null, 'whisper');
+    }
 
     // Τέλος του κεφαλαίου IV: μόλις περάσεις στο V, παίζει η μεσαία cutscene.
     if (state === 'play' && region === CHAPTERS.length - 1 && Eurydice.state === 'none') playMiddle();
@@ -530,6 +549,7 @@ function spawn(saved) {
 
   Echoes.init();
   monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard, m.region));
+  for (const m of monsters) m.onSense = shadeSpeaks;
   killer = null;
   ExitDoor.reset();
   Altars.reset(chapter);
@@ -570,19 +590,19 @@ function spawn(saved) {
 }
 
 // Παίζει μια cutscene (με τη ζωγραφιά art από πάνω) και μετά καλεί το then.
-function playCutscene(lines, style, art, then) {
+function playCutscene(lines, style, art, then, who) {
   setState('cutscene');
   stopInput();
   Hints.stop();
   Notice.clear();
   showScreen(null);
-  Cutscene.play(lines, style, then, art);
+  Cutscene.play(lines, style, then, art, who);
 }
 
 function newGame() {
   Save.clear();
   goFullscreen();
-  playCutscene(STORY.intro, '', 'intro', () => spawn(Save.fresh()));
+  playCutscene(STORY.intro, '', 'intro', () => spawn(Save.fresh()), STORY.introWho);
 }
 
 // Τέλος του κεφαλαίου IV: ο Άδης δίνει την Ευρυδίκη. Μετά συνεχίζεις από εκεί
@@ -594,7 +614,7 @@ function playMiddle() {
     setState('play');
     showScreen(null);
     updateHud();
-  });
+  }, STORY.middleWho);
 }
 
 function continueGame() {

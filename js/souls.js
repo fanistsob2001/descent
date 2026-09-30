@@ -13,9 +13,15 @@ const Souls = {
   reset() {
     this.list = Level.souls.map((s) => ({
       n: s.n, x: s.x, y: s.y, lines: null, revealTime: -1e6,
+      spokeAt: -1e6,
       onHear(wave, d, los) {
         if (!los || wave.kind === 'step') return;   // τα βήματα είναι πολύ αχνά για να τα φέρουν
         this.revealTime = Echoes.now;
+        // Ψιθυρίζει τα λόγια της (όχι ξανά μέσα σε 12 δευτ.).
+        if (Echoes.now - this.spokeAt > 12) {
+          this.spokeAt = Echoes.now;
+          Voice.say(STORY.souls[this.n - 1], 'soul', { x: this.x, y: this.y, delay: 0.3 });
+        }
       },
     }));
   },

@@ -16,7 +16,21 @@ const Eurydice = {
   y: 0,
   stepDist: 0,
 
+  // Ψιθυρίζει "Orpheus... I am right behind you." λίγο μετά που αρχίζει να σε ακολουθεί,
+  // και μετά πού και πού (κάθε 45-75 δευτ.). Το main ρωτάει με wantsToSpeak(now).
+  nextWhisper: 0,
+  whisperArmed: false,
+
+  wantsToSpeak(now) {
+    if (this.state !== 'following') return false;
+    if (!this.whisperArmed) { this.whisperArmed = true; this.nextWhisper = now + 5; return false; }
+    if (now < this.nextWhisper) return false;
+    this.nextWhisper = now + 45 + Math.random() * 30;
+    return true;
+  },
+
   reset(state, p) {
+    this.whisperArmed = false;
     this.state = state;
     this.trail = [{ x: p.x, y: p.y }];
     this.x = p.x;
