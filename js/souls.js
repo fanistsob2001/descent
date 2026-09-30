@@ -8,8 +8,8 @@ const SOUL_FADE = 1.5;        // και μετά σβήνει σε τόσο
 const SOUL_FONT = 14;         // μέγεθος γραμμάτων σε μονάδες κόσμου (~12px σε κινητό)
 const SOUL_WIDTH = 210;       // πλάτος γραμμής πριν αλλάξει σειρά
 const SOUL_ABOVE = 34;        // πόσο πάνω από το πνεύμα είναι η τελευταία γραμμή
-// Ποια φωνή έχει κάθε ψυχή (1..6), ανάλογα με το ποιος μιλάει (STORY.md, ενότητα 10).
-const SOUL_VOICES = ['soulM', 'soulOld', 'soulF', 'soulM', 'soulF', 'soulF'];
+// Ποια φωνή έχει κάθε ψυχή (1..9), ανάλογα με το ποιος μιλάει (STORY.md, ενότητα 10).
+const SOUL_VOICES = ['soulM', 'soulOld', 'soulF', 'soulM', 'soulF', 'soulF', 'soulM', 'soulF', 'soulOld'];
 
 const Souls = {
   list: [],   // { n, x, y, lines, revealTime, onHear }

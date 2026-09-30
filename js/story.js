@@ -55,6 +55,9 @@ const STORY = {
     "The shades cannot see. They listen. Walk as if you do not exist.",
     "The queen ate six pomegranate seeds. That is why she can never leave.",
     "Everyone looks back at the end. Everyone.",
+    "I was not good enough for Elysium, nor wicked enough for Tartarus. So I wait here, and nothing ever happens.",
+    "I swore I would wait for him. The river remembers every oath.",
+    "The Furies have never wept. They say only a song could make them.",
   ],
 
   checkpoint: "The flame is lit. Your progress is saved.",
@@ -69,6 +72,10 @@ const STORY = {
   shadeLines: [
     "Who is there?",
     "I hear life...",
+  ],
+  erinysLines: [
+    "Who dares to sing here?",
+    "We hear you, living one.",
   ],
 
   // Easter eggs (STORY.md, ενότητα 9).

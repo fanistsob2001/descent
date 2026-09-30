@@ -21,7 +21,7 @@ const Level = {
   terrain: null,       // Uint8Array, T_FLOOR | T_WALL | T_WATER | T_CHASM
   region: null,        // Int8Array: σε ποιο κεφάλαιο ανήκει κάθε κελί (-1 = γέμισμα)
   start: { x: 0, y: 0 },
-  monsters: [],        // { x, y, guard, region } — θέσεις εκκίνησης των σκιών
+  monsters: [],        // { x, y, guard, region, kind: 'shade' | 'erinys' } — θέσεις εκκίνησης των τεράτων
   altars: [],          // { x, y, tx, ty } — ένας βωμός ανά κεφάλαιο, με τη σειρά
   items: [],           // { kind: 'obol' | 'string' | 'jar', x, y, region } — ο δείκτης είναι το id
   gates: [],           // { tx, ty, x, y, open } — η βάρκα του Χάροντα
@@ -83,12 +83,13 @@ const Level = {
           const cx = (wx + 0.5) * TILE, cy = (wy + 0.5) * TILE;
           if (c === 'S') { this.start.x = cx; this.start.y = cy; }
           if (c === 'C') this.altars[r] = { x: cx, y: cy, tx: wx, ty: wy };
-          if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G', region: r });
+          if (c === 'M' || c === 'G') this.monsters.push({ x: cx, y: cy, guard: c === 'G', region: r, kind: 'shade' });
+          if (c === 'F') this.monsters.push({ x: cx, y: cy, guard: true, region: r, kind: 'erinys' });
           if (c === 'E') { this.exit.tx = wx; this.exit.ty = wy; this.exit.x = cx; this.exit.y = cy; }
           if (c === 'w') this.gates.push({ tx: wx, ty: wy, x: cx, y: cy, open: true });
           const kind = { o: 'obol', s: 'string', j: 'jar' }[c];
           if (kind) this.items.push({ kind, x: cx, y: cy, region: r });
-          if (c >= '1' && c <= '6') this.souls.push({ n: Number(c), x: cx, y: cy });
+          if (c >= '1' && c <= '9') this.souls.push({ n: Number(c), x: cx, y: cy });
           if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
           if (c === 'D') this.eggs.cerberus = { x: cx, y: cy };
         }
@@ -209,7 +210,8 @@ const Level = {
 
   // Αναζήτηση κατά πλάτος στο πλέγμα. Επιστρέφει Int32Array με την απόσταση
   // (σε κελιά) κάθε κελιού από το (sx, sy), -1 = απρόσιτο, και τον "γονέα" του.
-  bfs(sx, sy, maxSteps = Infinity) {
+  // fly = true: για όσους πετάνε (Ερινύες) — περνάνε πάνω από νερό και χάσματα, όχι από τοίχους.
+  bfs(sx, sy, maxSteps = Infinity, fly = false) {
     const n = this.cols * this.rows;
     const dist = new Int32Array(n).fill(-1);
     const parent = new Int32Array(n).fill(-1);
@@ -224,7 +226,7 @@ const Level = {
       const cx = cur % this.cols, cy = (cur / this.cols) | 0;
       const next = [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]];
       for (const [nx, ny] of next) {
-        if (this.isWall(nx, ny)) continue;
+        if (fly ? this.isOpaque(nx, ny) : this.isWall(nx, ny)) continue;
         const ni = ny * this.cols + nx;
         if (dist[ni] !== -1) continue;
         dist[ni] = dist[cur] + 1;
@@ -236,9 +238,9 @@ const Level = {
   },
 
   // Διαδρομή από κελί σε κελί: λίστα από [tx, ty], χωρίς το αρχικό κελί.
-  findPath(sx, sy, tx, ty) {
-    if (this.isWall(tx, ty)) return [];
-    const { parent, dist } = this.bfs(sx, sy);
+  findPath(sx, sy, tx, ty, fly = false) {
+    if (fly ? this.isOpaque(tx, ty) : this.isWall(tx, ty)) return [];
+    const { parent, dist } = this.bfs(sx, sy, Infinity, fly);
     let cur = ty * this.cols + tx;
     if (dist[cur] === -1) return [];
     const path = [];
@@ -251,8 +253,8 @@ const Level = {
 
   // Τυχαίο κελί διαδρόμου σε απόσταση minSteps..maxSteps (σε κελιά) από το (sx, sy).
   // Αν δοθεί region, μόνο κελιά αυτού του κεφαλαίου (οι σκιές δεν αλλάζουν κεφάλαιο).
-  randomFloorNear(sx, sy, minSteps, maxSteps, region) {
-    const { dist } = this.bfs(sx, sy, maxSteps);
+  randomFloorNear(sx, sy, minSteps, maxSteps, region, fly = false) {
+    const { dist } = this.bfs(sx, sy, maxSteps, fly);
     const options = [];
     for (let i = 0; i < dist.length; i++) {
       if (dist[i] < minSteps || dist[i] > maxSteps) continue;

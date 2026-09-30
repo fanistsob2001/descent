@@ -178,7 +178,8 @@ function shadeSpeaks(m) {
   if (Math.hypot(m.x - player.x, m.y - player.y) > 460) return;
   if (gameTime - (m.spokeAt || -1e6) < 9 || gameTime - lastShadeVoice < 3.5) return;
   m.spokeAt = lastShadeVoice = gameTime;
-  const line = STORY.shadeLines[Math.floor(Math.random() * STORY.shadeLines.length)];
+  const lines = m.kind === 'erinys' ? STORY.erinysLines : STORY.shadeLines;
+  const line = lines[Math.floor(Math.random() * lines.length)];
   const d = Voice.say(line, m.voice, { x: m.x, y: m.y });
   if (!Notice.busy(gameTime)) Notice.show(line, gameTime, d + 1, null, 'shade');
 }
@@ -813,10 +814,13 @@ function spawn(saved) {
   Level.mergeSeen(saved.seen);
 
   Echoes.init();
-  monsters = Level.monsters.map((m) => new Monster(m.x, m.y, m.guard, m.region));
+  monsters = Level.monsters.map((m) => (m.kind === 'erinys'
+    ? new Erinys(m.x, m.y, m.region)
+    : new Monster(m.x, m.y, m.guard, m.region)));
   monsters.forEach((m, i) => {
     m.onSense = shadeSpeaks;
-    m.voice = i % 2 ? 'shadeF' : 'shade';   // μισές σκιές με αντρική, μισές με γυναικεία φωνή
+    // Μισές σκιές με αντρική, μισές με γυναικεία φωνή· οι Ερινύες με τη δική τους.
+    m.voice = m.kind === 'erinys' ? 'erinys' : i % 2 ? 'shadeF' : 'shade';
   });
   killer = null;
   ExitDoor.reset();
@@ -911,8 +915,8 @@ function die() {
   Hints.stop();
   Notice.clear();
   showScreen(null);
-  Scare.prepare();
-  Sound.scare();
+  Scare.prepare(killer ? killer.kind : 'shade');
+  Sound.scare(killer ? killer.kind : 'shade');
   vibrate([250, 60, 500]);
 }
 

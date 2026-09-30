@@ -733,8 +733,9 @@ const Sound = {
   },
 
   // Jump scare: ένα χορωδιακό ουρλιαχτό νεκρών (έξι φωνές με δυσαρμονικά διαστήματα που
-  // ανεβαίνουν απότομα), ένα χτύπημα πέτρας και το τρίξιμο του πηλού που σπάει.
-  scare() {
+  // ανεβαίνουν απότομα), ένα χτύπημα και ένα 8-bit στρίγγλισμα.
+  // kind: 'shade' | 'erinys' — η Ερινύα ουρλιάζει πιο ψηλά, με σφύριγμα φιδιών και φτερουγίσματα.
+  scare(kind = 'shade') {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
 
@@ -782,7 +783,7 @@ const Sound = {
     ratios.forEach((r, i) => {
       const o = ac.createOscillator();
       o.type = 'sawtooth';
-      const f = 330 * r;
+      const f = (kind === 'erinys' ? 470 : 330) * r;
       o.frequency.setValueAtTime(f * 0.7, t);
       o.frequency.exponentialRampToValueAtTime(f * 1.55, t + 0.16);            // πηδάει προς τα πάνω
       o.frequency.exponentialRampToValueAtTime(f * (1.15 + (i % 3) * 0.08), t + 0.75);
@@ -832,6 +833,38 @@ const Sound = {
     sg.connect(this.echoSend);
     sq.start(t + 0.19);
     sq.stop(t + 0.65);
+
+    if (kind === 'erinys') {
+      // 4) Τα φίδια στα μαλλιά της σφυρίζουν όλα μαζί.
+      const hiss = this.noiseSource();
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 3800;
+      const hg = ac.createGain();
+      hg.gain.setValueAtTime(0.0001, t);
+      hg.gain.exponentialRampToValueAtTime(0.3, t + 0.05);
+      hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      hiss.connect(hp);
+      hp.connect(hg);
+      hg.connect(this.sfx);
+      hiss.start(t, Math.random());
+      hiss.stop(t + 0.75);
+      // 5) Φτερουγίσματα: βαθιά φουπ από θόρυβο.
+      for (let i = 0; i < 4; i++) {
+        const tt = t + 0.08 + i * 0.13;
+        const n = this.noiseSource();
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 320;
+        const g = ac.createGain();
+        this.envelope(g.gain, tt, 0.6, 0.02, 0.1);
+        n.connect(lp);
+        lp.connect(g);
+        g.connect(this.sfx);
+        n.start(tt, Math.random());
+        n.stop(tt + 0.15);
+      }
+    }
   },
 
 

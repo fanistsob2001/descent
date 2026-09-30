@@ -135,6 +135,47 @@ const SHADE_TAT = {
   B: ['...Kk.kK......', '...Kk..kK.....'],
 };
 
+// ---- Ερινύα (φτερωτή γυναίκα από μπροστά, φίδια στα μαλλιά, κίτρινα μάτια) ----
+// Γράφεται μόνο το αριστερό μισό· το δεξί είναι καθρέφτης. Δύο καρέ: φτερά κάτω / πάνω.
+const ERINYS_HALF = {
+  A: [
+    '........g',
+    '.....g.gG',
+    'K...gGgGR',
+    'KK..GgRRR',
+    'KkK..gRyR',
+    'KkkK..RRR',
+    'KkkkK..RR',
+    '.KkkkKkkk',
+    '..KkkkKkk',
+    '...KKkkkk',
+    '....KRkkk',
+    '.....Rkkk',
+    '......kkk',
+    '......kKk',
+    '.......kK',
+    '.......K.',
+  ],
+  B: [
+    'K.......g',
+    'KK...g.gG',
+    'KkK.gGgGR',
+    '.KkKGgRRR',
+    '..KkKgRyR',
+    '...KkKRRR',
+    '....KkKRR',
+    '.....Kkkk',
+    '......Kkk',
+    '......kkk',
+    '....KRkkk',
+    '.....Rkkk',
+    '......kkk',
+    '......kKk',
+    '.......kK',
+    '.......K.',
+  ],
+};
+
 // ---- Χαμένη ψυχή (φωτεινό χλωμό πνεύμα, μισό σώμα με ουρά) ----
 const SOUL_TOP = [
   '...ppp...',
@@ -319,6 +360,8 @@ const Sprites = {
     }
     this.frames.eurydice = ['A', 'C', 'B', 'C'].map((k) => this.build([...EURY_TOP, ...EURY_HEM[k]], '120,110,100'));
     this.frames.shade = ['A', 'B'].map((k) => this.build([...SHADE_TOP, ...SHADE_TAT[k]], POT.terra));
+    const mirror = (r) => r + [...r].reverse().join('');
+    this.frames.erinys = ['A', 'B'].map((k) => this.build(ERINYS_HALF[k].map(mirror), POT.terra));
     this.frames.soul = ['A', 'B'].map((k) => this.build([...SOUL_TOP, ...SOUL_TAIL[k]], '160,140,120'));
     this.frames.snake = ['coil', 'hiss'].map((k) => this.build([...SNAKE_TOP[k], ...SNAKE_BASE], '30,16,8'));
     this.frames.grass = [this.build(GRASS, null)];

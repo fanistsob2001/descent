@@ -25,6 +25,8 @@ const VOICES = {
   // Σκιές: παραμορφωμένο βογκητό, αντρικό ή γυναικείο.
   shade:    { wave: 'sawtooth', f0: 110, syl: 0.2, range: 7, cut: 1700, crush: 0.85, breath: 0.35, wobble: 1.8, vol: 0.24, reverb: 0.7, fmt: 0.88 },
   shadeF:   { wave: 'sawtooth', f0: 215, syl: 0.19, range: 7, cut: 2600, crush: 0.8, breath: 0.4, wobble: 1.9, vol: 0.22, reverb: 0.7, fmt: 1.18 },
+  // Ερινύες: γυναικείο, τραχύ στρίγγλισμα με σφύριγμα φιδιών (πολύ θόρυβος).
+  erinys:   { wave: 'sawtooth', f0: 255, syl: 0.17, range: 8, cut: 3400, crush: 0.7, breath: 0.6, wobble: 1.2, vol: 0.22, reverb: 0.75, fmt: 1.22 },
   // Χαμένες ψυχές: ψίθυροι — άντρας, γέρος, γυναίκα.
   soulM:    { wave: 'triangle', f0: 118, syl: 0.16, range: 3, cut: 2500, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, hum: 0.14, reverb: 0.8, fmt: 0.88 },
   soulOld:  { wave: 'triangle', f0: 92, syl: 0.19, range: 2, cut: 2100, crush: 0, breath: 1, wobble: 0.5, vol: 0.2, whisper: true, hum: 0.12, reverb: 0.8, fmt: 0.82 },

@@ -12,14 +12,15 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 - Based on the Greek myth of Orpheus and Eurydice.
 - The player is Orpheus, descending into the Underworld to bring Eurydice back.
 - Monsters are now called **shades** (souls of the dead). They are blind and hunt by sound, exactly like the current monsters.
-- Target length: about **15-25 minutes** for a first playthrough. Each chapter about **3-4 minutes**.
+- In Tartarus there are also **Erinyes** (the Furies): winged women with snakes for hair. They fly (over water and chasms), hear only loud sounds (a big wave or a shattering jar, never footsteps or small waves), but when they hear one they are faster than a running Orpheus.
+- Target length: about **25-35 minutes** for a first playthrough. Each chapter about **3-4 minutes**.
 
 ## 2. Structure
 
-- **One continuous map** instead of 5 separate levels, split into **5 chapters**.
+- **One continuous map** instead of separate levels, split into **8 chapters**.
 - **Organic linear flow, NOT a maze:** a continuous, atmospheric downward descent through open chambers, corridors, ruins and bridges. No complex mazes, no stressful dead ends. The challenge is avoiding the shades (stealth) and timing, not finding the way.
 - Small, **optional side rooms** hold the collectibles (lyre strings) and the lost soul inscriptions.
-- Keep the existing difficulty ramp: tutorial → 1 shade → decoy introduced → 2 shades → hardest.
+- Difficulty ramp: tutorial → 1 shade → decoy introduced → 2 shades in the open → sound carries over water → Erinyes (only loud sounds are dangerous) → the palace → hardest.
 - At the start of each chapter there is a **checkpoint**: an altar with an unlit flame.
   - Reaching it lights the flame and saves progress.
   - Shows: "The flame is lit. Your progress is saved."
@@ -33,24 +34,27 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 | I | The Gate of Taenarum | 0 | Tutorial: movement, sound waves, slow walking is silent. |
 | II | The Shore of Acheron | 1 | Find the obol and pay Charon to cross (the obol works as a key for a gate). First string. |
 | III | The Waters of Lethe | 1 (guarding the passage) | Libation jar introduced. **Lethe effect:** in this chapter, revealed walls fade much faster (about 0.5s instead of 1.5s). Second string. |
-| IV | The Palace of Hades | 2 | Third string. Middle cutscene plays at the end of this chapter. |
-| V | The Ascent | 2 | Eurydice follows. The "Don't look back" rule (see section 5). |
+| IV | The Asphodel Meadows | 2 | A wide, open meadow with scattered stones: nowhere to hide, the shades can come from any side. |
+| V | The Marshes of Styx | 2 (one guarding) | Narrow causeways over black water. Sound carries over the water, so shades hear from across it. |
+| VI | The Pit of Tartarus | 2 Erinyes | Chasms and bridges. The Erinyes hear only loud sounds: keep the waves small (a rehearsal for the Ascent). |
+| VII | The Palace of Hades | 2 | Third string. Middle cutscene plays at the end of this chapter. |
+| VIII | The Ascent | 2 | Eurydice follows. The "Don't look back" rule (see section 5). |
 
 ## 4. Items and abilities
 
 - **Obol** (chapter II): a coin. Needed to pay Charon. Without it, the gate/boat does not open.
 - **Libation jar** (replaces the old decoy): thrown the same way as the old decoy. It shatters with a loud sound and the shades go to it. Limited number, with a counter on screen. More jars can be found on the map.
-- **Lyre strings** (3 total: one in chapter II, one in III, one in IV): optional collectibles hidden off the main path. The count is shown as "Strings: X/3".
+- **Lyre strings** (3 total: one in chapter II, one in III, one in VII): optional collectibles hidden off the main path. The count is shown as "Strings: X/3".
 - **Melody** (ability): unlocked when all 3 strings are collected. Freezes nearby shades for a few seconds. Limited uses, refilled at each checkpoint. Its own button on mobile, key Q on PC.
 
-## 5. Chapter V rule: "Don't look back"
+## 5. Chapter VIII rule: "Don't look back"
 
 - Eurydice follows the player. Soft footsteps are heard behind the player, and now and then she whispers "Orpheus... I am right behind you."
 - Small waves are allowed. A **big wave** (charging past a threshold) means "looking back".
-- While charging in chapter V, the charge indicator turns red past that threshold as a warning, with a warning vibration pulse and rising tension audio.
+- While charging in chapter VIII, the charge indicator turns red past that threshold as a warning, with a warning vibration pulse and rising tension audio.
 - **Drag-to-cancel:** the player can drag the finger away (while holding) to cancel a charged wave safely without releasing it. This works in every chapter.
 - If the player releases a big wave: a whisper "Orpheus..." that fades away into silence, then the text "The footsteps behind you stop." Her footsteps stop for good. The player continues alone, and this leads to the bad ending.
-- Reaching the exit without a big wave in chapter V leads to the good ending.
+- Reaching the exit without a big wave in chapter VIII leads to the good ending.
 - After the bad ending, offer: "Try again from the last checkpoint" and "Main menu".
 
 ## 6. Art direction
@@ -58,14 +62,14 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 - **Retro 8-bit / pixel art combined with ancient Greek pottery**: black background, terracotta/orange outlines, dark clay floor tiles, meander (Greek key) patterns as borders and decoration.
 - Waves reveal walls as terracotta lines (and the clay floor tiles), as if uncovering a painted vase.
 - Smooth camera follow, subtle screen shake on jump scares. Works in portrait and landscape.
-- Characters (Orpheus, shades, Charon, Eurydice) are drawn as simple silhouettes in the same style.
-- The jump scare face is the face of a shade, drawn like the shades in the game (same pixel style, same glowing white eyes).
+- Characters (Orpheus, Eurydice, shades, Erinyes, Charon, the lost souls; Hades, Persephone and the snake in the cutscenes) are 8-bit pixel sprites in the same warm palette. The Erinyes are winged women seen from the front: dark red faces, glowing yellow eyes, golden snakes for hair, black robes and wings; they hover as they fly.
+- The jump scare face is the face of the monster that caught Orpheus, drawn like it is in the game (same pixel style): a shade (glowing white eyes, black tears, jagged teeth) or an Erinys (snakes for hair, yellow eyes, screaming mouth, wings).
 
 ## 7. Menu and cutscenes
 
 - **Main menu:** New Game, Continue (from last checkpoint, only if a save exists), Settings (sound on/off, vibration on/off). One save slot only.
 - **Cutscenes:** text lines fade in one at a time on a black screen, with subtle sound. Tap/click to advance, with a Skip button.
-- Cutscenes: Intro (on New Game), Middle (end of chapter IV), Good ending, Bad ending.
+- Cutscenes: Intro (on New Game), Middle (end of chapter VII), Good ending, Bad ending.
 - **All characters have voices** (see section 10), always with subtitles.
 
 ---
@@ -100,11 +104,23 @@ Objective: Find an obol to pay the ferryman. A string lies somewhere along the s
 Line: What you see here, you soon forget. Do not forget why you came.
 Objective: A string sank near the river. Strings: X/3
 
-**IV. The Palace of Hades**
+**IV. The Asphodel Meadows**
+Line: Here wander the dead who were neither good nor wicked. Only forgotten.
+Objective: The meadow is wide and open. Cross it unheard. Strings: X/3
+
+**V. The Marshes of Styx**
+Line: Even the gods fear this water. They swear their oaths on it.
+Objective: Sound carries far over the water. Cross the causeways quietly. Strings: X/3
+
+**VI. The Pit of Tartarus**
+Line: Below everything, the Furies keep watch over the damned.
+Objective: The Furies hear only loud sounds, but nothing is faster. Keep your voice low. Strings: X/3
+
+**VII. The Palace of Hades**
 Line: The king of the dead has never heard a song.
 Objective: A string is hidden in the palace. Strings: X/3
 
-**V. The Ascent**
+**VIII. The Ascent**
 Line: Behind you, footsteps. Hers. Do not look back.
 Objective if Strings = 3/3: Your lyre is whole. Play it when the shades come near.
 Objective otherwise: Your lyre is still broken. You climb without its song.
@@ -117,20 +133,24 @@ Objective otherwise: Your lyre is still broken. You climb without its song.
 - Picking up a libation jar: A libation jar. The dead hunger for offerings. Throw it, and they will come.
 - Picking up a string (1st and 2nd): You found a string (X/3).
 - Picking up the 3rd string: Your lyre is whole again. When you play, the shades remember they were once alive.
-- Big wave in chapter V: (whisper) Orpheus... then: The footsteps behind you stop.
-- Eurydice following in chapter V (soft whisper, now and then): Orpheus... I am right behind you.
+- Big wave in chapter VIII: (whisper) Orpheus... then: The footsteps behind you stop.
+- Eurydice following in chapter VIII (soft whisper, now and then): Orpheus... I am right behind you.
 - Shades, when they sense a sound wave (distorted whisper, one of): Who is there? | I hear life...
+- Erinyes, when they hear a loud sound (shriek, one of): Who dares to sing here? | We hear you, living one.
 
 ### Messages from lost souls
-Hidden on the map, visible only when a wave touches them. Placement: 1 in chapter I, 2 in II, 3 and 4 in III, 5 in IV, 6 in V.
+Hidden on the map, visible only when a wave touches them. Placement: 1 in chapter I, 2 in II, 3 and 4 in III, 7 in IV, 8 in V, 9 in VI, 5 in VII, 6 in VIII.
 1. I thought I would find my way back, too.
 2. I had no obol. I have waited on this shore for a hundred years.
 3. I drank from the river. I don't remember my name. Only that someone was waiting for me.
 4. The shades cannot see. They listen. Walk as if you do not exist.
 5. The queen ate six pomegranate seeds. That is why she can never leave.
 6. Everyone looks back at the end. Everyone.
+7. I was not good enough for Elysium, nor wicked enough for Tartarus. So I wait here, and nothing ever happens.
+8. I swore I would wait for him. The river remembers every oath.
+9. The Furies have never wept. They say only a song could make them.
 
-### Middle cutscene (end of chapter IV)
+### Middle cutscene (end of chapter VII)
 Orpheus played.
 For the first time, something wept in the Underworld.
 Persephone leaned toward Hades. He was silent for a long time.
@@ -157,14 +177,14 @@ Just like in the myth.
 
 ## 9. Easter eggs (add ONLY after all 4 stages are done)
 
-Rule: easter eggs are hidden and harmless. Never in chapter V, cutscenes or endings.
+Rule: easter eggs are hidden and harmless. Never in chapter VIII, cutscenes or endings.
 
 **A. The shade stuck in the wall** (chapter II)
 - In a quiet side corridor, a harmless shade endlessly walks into a wall, like a pathfinding bug.
 - It never chases the player, never hears sounds and cannot kill.
 - When a wave touches it, show: I have been walking into this wall for three thousand years.
 
-**B. Cerberus sleeps** (hidden room, chapter IV)
+**B. Cerberus sleeps** (hidden room, chapter VII)
 - A small, out-of-the-way room with no shades nearby. A big three-headed dog silhouette sleeps there (same pottery style).
 - When a wave touches it, it barks three times, each head at a different pitch (low, middle, high).
 - Show: Good boy. Good boy. Good boy.
@@ -184,7 +204,8 @@ Every line of dialogue is voiced, always with subtitles. Voices are synthesized 
 | Hades | deep, heavy (male) | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
 | Eurydice | soft, high, breathy whisper (female) | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) · Good ending: "You didn't look..." |
 | Shades | distorted, eerie whisper/moan, from where the shade is; half of the shades male, half female | "Who is there?" · "I hear life..." |
-| Lost souls | whispered, from where the inscription is: souls 1 and 4 a man, soul 2 an old man, souls 3, 5 and 6 a woman | Each inscription is spoken when a wave touches it |
+| Erinyes | female, harsh shriek with hissing snakes, from where the Erinys is | "Who dares to sing here?" · "We hear you, living one." |
+| Lost souls | whispered, from where the inscription is: souls 1, 4 and 7 a man, souls 2 and 9 an old man, souls 3, 5, 6 and 8 a woman | Each inscription is spoken when a wave touches it |
 
 Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
 

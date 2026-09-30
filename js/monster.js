@@ -40,6 +40,16 @@ class Monster {
 
     // Η Μελωδία την παγώνει: δεν κινείται, δεν ακούει, δεν σκοτώνει.
     this.frozenUntil = -1e6;
+
+    // Είδος τέρατος: οι Ερινύες (παρακάτω) αλλάζουν αυτά.
+    this.kind = 'shade';      // και το sprite του / το jump scare του
+    this.fly = false;         // πετάει πάνω από νερό και χάσματα
+    this.speeds = MONSTER_SPEED;
+  }
+
+  // Ακούει αυτό το κύμα; (οι σκιές ακούνε τα πάντα· οι Ερινύες μόνο τους δυνατούς ήχους)
+  hears(wave) {
+    return true;
   }
 
   freeze(until) {
@@ -74,6 +84,7 @@ class Monster {
       }
     }
 
+    if (!this.hears(wave)) return revealed;
     const range = los ? wave.radius : wave.radius * MONSTER_MUFFLED_RANGE;
     if (d > range) return revealed;
     // Ήχοι από άλλο κεφάλαιο δεν την τραβάνε έξω από το δικό της.
@@ -96,7 +107,7 @@ class Monster {
   goTo(tx, ty) {
     const cx = Math.floor(this.x / TILE), cy = Math.floor(this.y / TILE);
     // Πρώτα στο κέντρο του τωρινού κελιού, ώστε να μην κόβει γωνίες τοίχων.
-    this.path = [[cx, cy], ...Level.findPath(cx, cy, tx, ty)];
+    this.path = [[cx, cy], ...Level.findPath(cx, cy, tx, ty, this.fly)];
   }
 
   pickNextGoal(now) {
@@ -113,15 +124,15 @@ class Monster {
         this.state = 'wander';
       } else {
         const sx = Math.floor(this.soundX / TILE), sy = Math.floor(this.soundY / TILE);
-        const [tx, ty] = Level.randomFloorNear(sx, sy, 1, 3, this.region);
+        const [tx, ty] = Level.randomFloorNear(sx, sy, 1, 3, this.region, this.fly);
         this.goTo(tx, ty);
         return;
       }
     }
 
     const [tx, ty] = this.guard
-      ? Level.randomFloorNear(this.homeTx, this.homeTy, 0, GUARD_RANGE, this.region)
-      : Level.randomFloorNear(cx, cy, 4, 12, this.region);
+      ? Level.randomFloorNear(this.homeTx, this.homeTy, 0, GUARD_RANGE, this.region, this.fly)
+      : Level.randomFloorNear(cx, cy, 4, 12, this.region, this.fly);
     this.goTo(tx, ty);
   }
 
@@ -129,7 +140,7 @@ class Monster {
     if (this.path.length === 0) this.pickNextGoal(now);
 
     if (now < this.frozenUntil) return;
-    let step = MONSTER_SPEED[this.state] * dt;
+    let step = this.speeds[this.state] * dt;
     while (step > 0 && this.path.length > 0) {
       const [tx, ty] = this.path[0];
       const gx = (tx + 0.5) * TILE, gy = (ty + 0.5) * TILE;
@@ -181,16 +192,19 @@ class Monster {
 
     // Κοιτάζει προς τον παίκτη, όπως ήταν τη στιγμή που φάνηκε.
     const flip = typeof player !== 'undefined' && player.x < x;
-    const r = Sprites.draw(ctx, 'shade', frame, x, y, { flip, alpha: a, center: true });
+    // Οι Ερινύες πετάνε: ανεβοκατεβαίνουν λίγο στον αέρα.
+    const hover = this.fly ? Math.sin(now * 4 + this.homeTx) * 3 : 0;
+    const r = Sprites.draw(ctx, this.kind, frame, x, y + hover, { flip, alpha: a, center: true });
 
     // Τα μάτια λάμπουν (λευκή λάμψη πάνω στα δύο pixels των ματιών).
-    const ex = r.x + (flip ? r.w - 9.5 : 9.5), ey = r.y + 3.5;
+    const [eyeX, eyeY, eyeColor] = this.kind === 'erinys' ? [r.w / 2, 5.5, '255,210,90'] : [9.5, 3.5, '255,250,235'];
+    const ex = r.x + (flip ? r.w - eyeX : eyeX), ey = r.y + eyeY;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, 4);
-    eg.addColorStop(0, `rgba(255,250,235,${(a * 0.45).toFixed(3)})`);
-    eg.addColorStop(1, 'rgba(255,250,235,0)');
+    eg.addColorStop(0, `rgba(${eyeColor},${(a * 0.45).toFixed(3)})`);
+    eg.addColorStop(1, `rgba(${eyeColor},0)`);
     ctx.fillStyle = eg;
     ctx.fillRect(ex - 4, ey - 4, 8, 8);
     ctx.restore();
@@ -217,5 +231,25 @@ class Monster {
     ctx.arc(x, y, this.r * 3, 0, Math.PI * 2);
     ctx.fill();
     Sprites.draw(ctx, 'soul', Math.floor(now * 2), x, y, { alpha: a, center: true });
+  }
+}
+
+// Ερινύες (κεφ. VI, F στον χάρτη): φτερωτές γυναίκες με φίδια στα μαλλιά, φύλακες του
+// Τάρταρου. Πετάνε (περνάνε πάνω από νερό και χάσματα), ακούνε ΜΟΝΟ τους δυνατούς ήχους
+// (μεγάλο κύμα, αγγείο — όχι βήματα ή μικρά κύματα), αλλά όταν ακούσουν ορμάνε πιο
+// γρήγορα κι από τον παίκτη που τρέχει. Όταν δεν κυνηγάνε, φυλάνε κοντά στη θέση τους.
+const ERINYS_SPEED = { wander: 32, hunt: 150, search: 60 };
+const ERINYS_LOUD = 0.78;   // ελάχιστη δύναμη κύματος που ακούνε (το αγγείο είναι 1)
+
+class Erinys extends Monster {
+  constructor(x, y, region) {
+    super(x, y, true, region);
+    this.kind = 'erinys';
+    this.fly = true;
+    this.speeds = ERINYS_SPEED;
+  }
+
+  hears(wave) {
+    return wave.kind !== 'step' && wave.strength >= ERINYS_LOUD;
   }
 }
